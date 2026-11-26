@@ -36,5 +36,8 @@ def api_root(request):
             "categories": reverse("category-list", request=request),
             "products": reverse("product-list", request=request),
             "orders": reverse("order-list", request=request),
+            # Organization endpoints answer 403 to a customer, but listing
+            # them makes the shape of the API discoverable.
+            "organization_orders": reverse("org-order-list", request=request),
         }
     )

@@ -91,6 +91,8 @@ LOCAL_APPS = [
     "accounts",
     "catalog",
     "orders",
+    # The staff-facing API. Owns no models; see organization/__init__.py.
+    "organization",
 ]
 
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS

@@ -28,6 +28,9 @@ class OrderSerializer(serializers.ModelSerializer):
         write_only=True,
     )
     quantity = serializers.IntegerField(min_value=1)
+    # Customers can watch their order progress, but only the organization
+    # can change where it has got to.
+    status_display = serializers.CharField(source="get_status_display", read_only=True)
 
     class Meta:
         model = Order
@@ -39,9 +42,22 @@ class OrderSerializer(serializers.ModelSerializer):
             "quantity",
             "unit_price",
             "total_price",
+            "status",
+            "status_display",
+            "status_updated_at",
+            "cancelled_at",
             "created_at",
         ]
-        read_only_fields = ["id", "user", "unit_price", "total_price", "created_at"]
+        read_only_fields = [
+            "id",
+            "user",
+            "unit_price",
+            "total_price",
+            "status",
+            "status_updated_at",
+            "cancelled_at",
+            "created_at",
+        ]
 
     def validate(self, attrs):
         """Reject the order early if the product does not have enough stock.

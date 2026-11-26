@@ -22,6 +22,8 @@ urlpatterns = [
     path("api/auth/", include("accounts.urls")),
     path("api/", include("catalog.urls")),
     path("api/", include("orders.urls")),
+    # Everything the people who run the shop use; closed to customers.
+    path("api/org/", include("organization.urls")),
     # Login/logout pages for DRF's browsable API (handy while developing).
     path("api-auth/", include("rest_framework.urls")),
 ]

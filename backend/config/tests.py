@@ -25,8 +25,19 @@ class ApiRootTests(SimpleTestCase):
             "categories",
             "products",
             "orders",
+            "organization_orders",
         ):
             self.assertIn(key, response.data)
+
+    def test_the_index_is_not_shadowed_by_an_app_router(self):
+        """A DefaultRouter registers its own view named "api-root". If an app
+        mounted under /api/ uses one, reverse("api-root") resolves to that
+        instead and GET /api/ silently lists only that app's routes."""
+        response = self.client.get(reverse("api-root"))
+
+        self.assertIn("login", response.data)
+        self.assertIn("products", response.data)
+        self.assertNotEqual(list(response.data), ["orders"])
 
     def test_api_root_is_public(self):
         """It is the first URL anyone tries, so it must not need a token."""
