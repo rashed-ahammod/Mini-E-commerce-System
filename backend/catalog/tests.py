@@ -12,6 +12,7 @@ from rest_framework import status
 from rest_framework.authtoken.models import Token
 from rest_framework.test import APITestCase
 
+from accounts.models import Role, profile_for
 from catalog.models import Category, Product
 from orders.models import Order
 
@@ -19,11 +20,22 @@ User = get_user_model()
 
 
 class CatalogTestCase(APITestCase):
-    """Shared fixtures: two categories, three products and a logged-in user."""
+    """Shared fixtures: two categories, three products, and two accounts.
+
+    `staff` is an organization user and is who `authenticate()` signs in as,
+    because changing the catalog is an organization job. `customer` is an
+    ordinary shopper, used by the tests that check a customer is refused.
+    """
 
     def setUp(self):
-        self.user = User.objects.create_user("alice", password="StrongPass!234")
+        self.user = User.objects.create_user("sam", password="StrongPass!234")
+        profile = profile_for(self.user)
+        profile.role = Role.STAFF
+        profile.save()
         self.token = Token.objects.create(user=self.user)
+
+        self.customer = User.objects.create_user("cara", password="StrongPass!234")
+        self.customer_token = Token.objects.create(user=self.customer)
 
         self.phones = Category.objects.create(name="Phones", description="Smartphones")
         self.laptops = Category.objects.create(name="Laptops")
@@ -50,7 +62,11 @@ class CatalogTestCase(APITestCase):
         )
 
     def authenticate(self):
+        """Sign in as the organization user."""
         self.client.credentials(HTTP_AUTHORIZATION=f"Token {self.token.key}")
+
+    def authenticate_as_customer(self):
+        self.client.credentials(HTTP_AUTHORIZATION=f"Token {self.customer_token.key}")
 
     def names_in(self, response):
         return [row["name"] for row in response.data["results"]]
@@ -387,3 +403,209 @@ class ProductApiTests(CatalogTestCase):
         )
 
         self.assertTrue(response.data["image"].startswith("http"))
+
+
+class CustomerCannotChangeTheCatalogTests(CatalogTestCase):
+    """A customer holds a valid token, but the catalog is not theirs to edit.
+
+    Before roles existed, any authenticated user could do all of this, which
+    meant anyone who registered could reprice or delete products.
+    """
+
+    def test_customer_cannot_create_a_category(self):
+        self.authenticate_as_customer()
+
+        response = self.client.post(
+            reverse("category-list"), {"name": "Fake"}, format="json"
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(Category.objects.count(), 2)
+
+    def test_customer_cannot_update_a_category(self):
+        self.authenticate_as_customer()
+
+        response = self.client.patch(
+            reverse("category-detail", args=[self.phones.id]),
+            {"name": "Hijacked"},
+            format="json",
+        )
+
+        self.phones.refresh_from_db()
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(self.phones.name, "Phones")
+
+    def test_customer_cannot_delete_a_category(self):
+        self.authenticate_as_customer()
+
+        response = self.client.delete(
+            reverse("category-detail", args=[self.laptops.id])
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertTrue(Category.objects.filter(id=self.laptops.id).exists())
+
+    def test_customer_cannot_create_a_product(self):
+        self.authenticate_as_customer()
+
+        response = self.client.post(
+            reverse("product-list"),
+            {
+                "name": "Free Phone",
+                "price": "0.01",
+                "stock": 999,
+                "category_id": self.phones.id,
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(Product.objects.count(), 3)
+
+    def test_customer_cannot_reprice_a_product(self):
+        self.authenticate_as_customer()
+
+        response = self.client.patch(
+            reverse("product-detail", args=[self.flagship.id]),
+            {"price": "0.01"},
+            format="json",
+        )
+
+        self.flagship.refresh_from_db()
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(self.flagship.price, Decimal("999.00"))
+
+    def test_customer_cannot_delete_a_product(self):
+        self.authenticate_as_customer()
+
+        response = self.client.delete(
+            reverse("product-detail", args=[self.cheap_phone.id])
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertTrue(Product.objects.filter(id=self.cheap_phone.id).exists())
+
+    def test_customer_can_still_read_everything(self):
+        """Restricting writes must not break shopping."""
+        self.authenticate_as_customer()
+
+        listing = self.client.get(reverse("product-list"))
+        detail = self.client.get(reverse("product-detail", args=[self.cheap_phone.id]))
+        categories = self.client.get(reverse("category-list"))
+
+        for response in (listing, detail, categories):
+            self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+    def test_anonymous_visitors_can_still_read(self):
+        listing = self.client.get(reverse("product-list"))
+
+        self.assertEqual(listing.status_code, status.HTTP_200_OK)
+
+
+class StockAdjustmentTests(CatalogTestCase):
+    def url(self, product=None):
+        return reverse("product-adjust-stock", args=[(product or self.cheap_phone).id])
+
+    def test_organization_user_can_add_stock(self):
+        self.authenticate()
+
+        response = self.client.post(
+            self.url(), {"delta": 15, "reason": "delivery received"}, format="json"
+        )
+
+        self.cheap_phone.refresh_from_db()
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["previous_stock"], 10)
+        self.assertEqual(response.data["new_stock"], 25)
+        self.assertEqual(response.data["reason"], "delivery received")
+        self.assertEqual(self.cheap_phone.stock, 25)
+
+    def test_negative_delta_removes_stock(self):
+        self.authenticate()
+
+        response = self.client.post(self.url(), {"delta": -4}, format="json")
+
+        self.cheap_phone.refresh_from_db()
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(self.cheap_phone.stock, 6)
+
+    def test_absolute_stock_can_be_set(self):
+        self.authenticate()
+
+        response = self.client.post(
+            self.url(), {"stock": 40, "reason": "stocktake"}, format="json"
+        )
+
+        self.cheap_phone.refresh_from_db()
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(self.cheap_phone.stock, 40)
+
+    def test_delta_cannot_take_stock_below_zero(self):
+        self.authenticate()
+
+        response = self.client.post(self.url(), {"delta": -50}, format="json")
+
+        self.cheap_phone.refresh_from_db()
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("delta", response.data)
+        self.assertEqual(self.cheap_phone.stock, 10)
+
+    def test_sending_both_delta_and_stock_is_rejected(self):
+        self.authenticate()
+
+        response = self.client.post(self.url(), {"delta": 5, "stock": 20}, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_sending_neither_is_rejected(self):
+        self.authenticate()
+
+        response = self.client.post(self.url(), {"reason": "nothing"}, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_zero_delta_is_rejected(self):
+        self.authenticate()
+
+        response = self.client.post(self.url(), {"delta": 0}, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_negative_absolute_stock_is_rejected(self):
+        self.authenticate()
+
+        response = self.client.post(self.url(), {"stock": -1}, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_customer_cannot_adjust_stock(self):
+        self.authenticate_as_customer()
+
+        response = self.client.post(self.url(), {"delta": 100}, format="json")
+
+        self.cheap_phone.refresh_from_db()
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(self.cheap_phone.stock, 10)
+
+    def test_anonymous_cannot_adjust_stock(self):
+        response = self.client.post(self.url(), {"delta": 100}, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_restocking_a_sold_out_product_puts_it_back_in_stock(self):
+        self.authenticate()
+
+        response = self.client.post(self.url(self.laptop), {"delta": 5}, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertTrue(response.data["product"]["in_stock"])
+
+
+class LowStockFilterTests(CatalogTestCase):
+    def test_low_stock_filter_finds_what_needs_reordering(self):
+        response = self.client.get(reverse("product-list"), {"low_stock": 3})
+
+        # Gaming Laptop has 0 and Flagship Phone has 3; Budget Phone has 10.
+        self.assertEqual(
+            sorted(self.names_in(response)), ["Flagship Phone", "Gaming Laptop"]
+        )

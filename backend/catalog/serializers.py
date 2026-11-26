@@ -113,3 +113,39 @@ class ProductSerializer(serializers.ModelSerializer):
         if value < 0:
             raise serializers.ValidationError("Price cannot be negative.")
         return value
+
+
+class StockAdjustmentSerializer(serializers.Serializer):
+    """Input for POST /api/products/{id}/adjust-stock/.
+
+    Two ways to say what should happen, and exactly one must be given:
+
+        {"delta": 25}    a relative change: +25 received, -3 damaged
+        {"stock": 40}    an absolute count, e.g. after a stocktake
+
+    `delta` is the safer of the two under concurrency: it is applied to
+    whatever the row holds at the time, so an order placed between reading
+    the page and submitting the form is not silently overwritten.
+    """
+
+    delta = serializers.IntegerField(required=False)
+    stock = serializers.IntegerField(required=False, min_value=0)
+    reason = serializers.CharField(
+        required=False,
+        allow_blank=True,
+        max_length=200,
+        help_text="Free text, echoed back in the response for the audit trail.",
+    )
+
+    def validate(self, attrs):
+        has_delta = "delta" in attrs
+        has_stock = "stock" in attrs
+
+        if has_delta == has_stock:
+            raise serializers.ValidationError(
+                "Send either 'delta' (a relative change) or 'stock' "
+                "(an absolute count), but not both."
+            )
+        if has_delta and attrs["delta"] == 0:
+            raise serializers.ValidationError({"delta": "Must not be zero."})
+        return attrs

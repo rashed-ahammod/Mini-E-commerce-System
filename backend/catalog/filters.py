@@ -13,6 +13,7 @@ class ProductFilter(filters.FilterSet):
         ?min_price=100           price greater than or equal to
         ?max_price=500           price less than or equal to
         ?in_stock=true           only products with stock left
+        ?low_stock=5             stock at or below 5 (restocking view)
     """
 
     min_price = filters.NumberFilter(field_name="price", lookup_expr="gte")
@@ -22,6 +23,8 @@ class ProductFilter(filters.FilterSet):
         lookup_expr="iexact",
     )
     in_stock = filters.BooleanFilter(method="filter_in_stock")
+    # Used by the organization side to find what needs reordering.
+    low_stock = filters.NumberFilter(field_name="stock", lookup_expr="lte")
 
     class Meta:
         model = Product
