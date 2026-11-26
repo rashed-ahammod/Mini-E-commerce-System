@@ -5,8 +5,8 @@ A Mini E-commerce REST API built with **Django REST Framework**, plus a
 
 The API covers categories, products with filtering/searching/ordering/
 pagination, token authentication and orders. The frontend is a small shop:
-browse and filter the catalog, add things to a cart, log in, place orders and
-look at your order history.
+browse and filter a catalog of 49 real products, add things to a cart, log
+in, place orders and look at your order history.
 
 ```
 ┌─────────────────────────┐        HTTP + token auth        ┌──────────────────────────┐
@@ -44,9 +44,12 @@ password: demo12345
 
 Things worth trying:
 
-- search for `phone`, filter by category or price, sort by price — every one
-  of those is done by the API, and the query string updates, so a filtered
-  view can be shared as a link
+- use the sidebar: search for `laptop`, pick a category, tap a price band,
+  tick **In stock only**, then sort by price. Every one of those is done by
+  the API, and the query string updates as you go, so any filtered view can
+  be shared as a link
+- find **Vivo X21** or **Samsung Galaxy S8** — both are out of stock, so
+  their cards are greyed out and marked *Sold out*
 - add something to the cart and check out — the order appears under
   **My orders**, and the product's stock goes down
 - try to order more units than are in stock, and the server refuses with the
@@ -83,7 +86,7 @@ python -m venv .venv
 pip install -r requirements.txt
 copy .env.example .env              # cp on macOS/Linux
 python manage.py migrate
-python manage.py seed_data --demo-user
+python manage.py seed_data --demo-user   # 49 products + demo account
 python manage.py runserver
 ```
 
@@ -106,8 +109,56 @@ Open <http://localhost:5173>.
 
 ```bash
 cd backend
-python manage.py test               # 60 tests
+python manage.py test               # 70 tests
 ```
+
+## Sample catalog
+
+`python manage.py seed_data` loads 49 products across 6 categories, each with
+a real name, description, price, stock level and photograph:
+
+| Category | Products | Examples |
+| --- | --- | --- |
+| Smartphones | 16 | iPhone 13 Pro, Samsung Galaxy S10, Vivo X21 |
+| Mobile Accessories | 14 | Apple Airpods, Apple MagSafe Battery Pack, Amazon Echo Plus |
+| Watches | 6 | Rolex Submariner Watch, Rolex Datejust, Longines Master Collection |
+| Laptops | 5 | Apple MacBook Pro 14 Inch Space Grey, Asus Zenbook Pro, Lenovo Yoga 920 |
+| Sunglasses | 5 | Classic Sun Glasses, Green and Black Glasses |
+| Tablets | 3 | iPad Mini 2021 Starlight, Samsung Galaxy Tab S8 Plus Grey |
+
+Prices run from **$12.99 to $13,999.99**, which makes the price filter and
+the price sort visibly do something. **Two products are deliberately out of
+stock** (Vivo X21, Samsung Galaxy S8) and three have a single unit left
+(Apple Airpower Wireless Charger, Apple MagSafe Battery Pack, Classic Sun
+Glasses), so the *Sold out* and *Only 1 left* states, and the
+stock-validation error, can all be demonstrated without editing data by
+hand.
+
+The data lives in
+[`catalog_data.json`](backend/catalog/management/commands/catalog_data.json)
+next to the command that loads it, so it can be reviewed, edited or
+regenerated without touching any code. Seeding is idempotent — products are
+matched by name within their category, so running it twice updates them
+rather than creating duplicates.
+
+### Product pictures
+
+A product can get its picture two ways:
+
+| Field | Used for |
+| --- | --- |
+| `image` | an uploaded file, served from `MEDIA_ROOT` |
+| `image_url` | a link to a picture hosted elsewhere |
+
+The API resolves whichever is set into a single `image` field in the
+response, so the frontend only ever reads one key. An **uploaded file wins**,
+so adding a real photo later replaces the seeded link rather than hiding
+behind it, and upload URLs are returned absolute because the frontend runs on
+a different origin.
+
+The seeded catalog uses `image_url`. Hosts like Render wipe the filesystem on
+every deploy, so uploaded files would disappear and leave the shop
+imageless after the first redeploy.
 
 ## What is implemented
 
@@ -127,10 +178,10 @@ Everything the assignment asks for, plus two of the optional extras.
 | Serializers, ModelViewSets, URL routing, model relationships | throughout |
 | Postman collection for API testing | `postman/` |
 | **Optional:** stock validation | `orders/serializers.py` |
-| **Optional:** product image | `Product.image` |
+| **Optional:** product image | `Product.image` (upload) and `Product.image_url` (hosted elsewhere) |
 
-Beyond the brief: 60 automated tests, a `seed_data` command, a React
-frontend, and deployment configuration.
+Beyond the brief: 70 automated tests, a seeded catalog of 49 real products,
+a React frontend, and deployment configuration.
 
 ## API at a glance
 
@@ -159,7 +210,7 @@ Authorization: Token 9f2c1b7e0a4d...
 Example requests:
 
 ```bash
-curl "http://127.0.0.1:8000/api/products/?search=phone&ordering=price"
+curl "http://127.0.0.1:8000/api/products/?search=laptop&ordering=price"
 curl "http://127.0.0.1:8000/api/products/?category=1&min_price=100&max_price=500"
 
 TOKEN=$(curl -s -X POST http://127.0.0.1:8000/api/auth/login/ \
@@ -254,8 +305,10 @@ pasted into `ALLOWED_HOSTS` by hand. Verify a configuration with
 
 - A free Render service **sleeps after ~15 minutes idle**; the next request
   takes about 50 seconds while it wakes.
-- **Uploaded product images do not survive a deploy** (ephemeral disk). The
-  seeded catalog has no images, so this only matters if you upload some.
+- **Uploaded product images do not survive a deploy** (ephemeral disk).
+  That is exactly why the seeded catalog references pictures by URL through
+  `Product.image_url` instead of uploading them; uploads through the admin
+  work locally but are wiped by the next deploy.
 
 ## Tech stack
 

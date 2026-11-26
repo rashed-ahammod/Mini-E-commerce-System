@@ -40,7 +40,8 @@ frontend/src/
 │   └── endpoints.js     every backend endpoint as a named function
 ├── auth/                AuthProvider, the context object, the useAuth hook
 ├── cart/                CartProvider, the context object, the useCart hook
-├── components/          Layout, NavBar, ProtectedRoute, Pagination, ProductCard
+├── components/          Layout, NavBar, ProtectedRoute, CatalogSidebar,
+│                         Pagination, ProductCard, ProductCardSkeleton
 ├── hooks/               useDebouncedValue
 ├── pages/               one file per screen
 ├── utils/format.js      price and date formatting
@@ -75,17 +76,36 @@ frontend/src/
 
 ### The catalog page
 
-Every filter is applied by the **API**, not in the browser, and all of them
-are stored in the URL query string. `/?search=phone&ordering=price&page=2` is
-a shareable link, and the back button moves between filter states.
+A sticky filter sidebar on the left, the product grid on the right.
 
-Two details worth knowing while debugging:
+[`CatalogSidebar.jsx`](src/components/CatalogSidebar.jsx) holds search,
+category (with a product count beside each), price — four preset bands as
+toggle chips plus min/max inputs — and an in-stock toggle. It is deliberately
+presentational: it collects values and hands them up, so all the fetching
+logic stays in [`ProductListPage.jsx`](src/pages/ProductListPage.jsx).
+
+Sorting sits in a toolbar above the grid rather than in the sidebar, because
+it is not a filter: it never changes how many results there are.
+
+Every filter is applied by the **API**, not in the browser, and all of them
+live in the URL query string. `/?search=laptop&category=2&ordering=price&page=2`
+is a shareable link, and the back button moves between filter states.
+
+Details worth knowing while debugging:
 
 - the search box is debounced (350 ms) and in-flight requests are aborted when
   the filters change, so a slow response cannot overwrite a newer one;
 - asking for a page past the end returns 404 from DRF, which the page catches
   and falls back to page 1 — that happens when you are on page 3 and then
-  narrow the filters.
+  narrow the filters;
+- below 860px the sidebar collapses behind a **Filters** button, because a
+  fixed column would squeeze the grid down to one narrow card per row;
+- while loading, the grid renders skeleton cards shaped like the real ones
+  ([`ProductCardSkeleton.jsx`](src/components/ProductCardSkeleton.jsx)) so it
+  does not jump when the data arrives;
+- a product's picture comes from the API as a single `image` field. Cards
+  fall back to a letter tile both when it is missing **and** when the image
+  fails to load, so one dead link never leaves a hole in the grid.
 
 ### The cart
 
@@ -139,5 +159,8 @@ npm run preview
   `utils/format.js`. The backend stores a plain decimal with no currency, so
   changing that one formatter changes the whole app.
 - **Searching matches the description too**, because the backend's
-  `search_fields` includes it. That is why `?search=phone` also returns
-  "NoiseCancel Pro" — its description mentions headphones.
+  `search_fields` includes it. That is why `?search=phone` returns 23
+  products rather than the handful whose *names* contain "phone" — "Oppo
+  A57" and "Realme XT" match because their descriptions mention a phone.
+  To match names only, drop `"description"` from `search_fields` in
+  `catalog/views.py`.

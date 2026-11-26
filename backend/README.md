@@ -23,7 +23,8 @@ backend/
 │   ├── serializers.py
 │   ├── filters.py          ProductFilter (category, price range, in_stock)
 │   ├── views.py            CategoryViewSet, ProductViewSet
-│   └── management/commands/seed_data.py
+│   ├── management/commands/seed_data.py
+│   └── management/commands/catalog_data.json   the sample catalog
 ├── orders/                 Order model, serializer with stock validation, viewset
 ├── manage.py
 ├── requirements.txt
@@ -39,7 +40,7 @@ python -m venv .venv
 pip install -r requirements.txt
 copy .env.example .env            # cp on macOS/Linux
 python manage.py migrate
-python manage.py seed_data --demo-user   # sample catalog + demo/demo12345
+python manage.py seed_data --demo-user   # 49 products + demo/demo12345
 python manage.py createsuperuser         # optional, for /admin/
 python manage.py runserver
 ```
@@ -47,15 +48,26 @@ python manage.py runserver
 - API: <http://127.0.0.1:8000/api/>
 - Admin: <http://127.0.0.1:8000/admin/>
 
-`seed_data` is safe to run repeatedly — products are matched by name within
-their category, so a second run updates them instead of creating duplicates.
-Add `--flush` to wipe the catalog (and orders) first.
+`seed_data` loads **49 products across 6 categories** (Smartphones, Mobile
+Accessories, Watches, Laptops, Sunglasses, Tablets), each with a real name,
+description, price, stock level and photograph. Two are deliberately out of
+stock and three have a single unit left, so the sold-out state and the
+stock-validation error can be demonstrated without editing data.
+
+The catalog itself lives in
+[`catalog/management/commands/catalog_data.json`](catalog/management/commands/catalog_data.json),
+separate from the command that loads it, so the data can be reviewed or
+regenerated without touching code.
+
+It is safe to run repeatedly — products are matched by name within their
+category, so a second run updates them instead of creating duplicates. Add
+`--flush` to wipe the catalog (and orders) first.
 
 ## Management commands
 
 | Command | What it does |
 | --- | --- |
-| `python manage.py seed_data` | Load the sample catalog. `--flush` clears first, `--demo-user` adds a `demo` account |
+| `python manage.py seed_data` | Load the 49-product sample catalog. `--flush` clears first, `--demo-user` adds a `demo` account |
 | `python manage.py db_info` | Report which database is actually in use: engine, host, TLS mode, server version, connection time and table count |
 
 `db_info` is the quickest way to tell whether you are on the local SQLite
@@ -127,15 +139,42 @@ id:
 ```jsonc
 // GET /api/products/1/
 {
-  "id": 1, "name": "Pixel Lite 5G", "price": "299.00", "stock": 25,
+  "id": 1, "name": "iPhone 13 Pro", "price": "1099.00", "stock": 32,
   "in_stock": true,
-  "category": { "id": 1, "name": "Phones" },
-  "image": null, "created_at": "...", "updated_at": "..."
+  "category": { "id": 1, "name": "Smartphones" },
+  "image": "https://cdn.example.com/iphone-13-pro.webp",
+  "created_at": "...", "updated_at": "..."
 }
 
 // POST /api/products/
-{ "name": "Pixel Lite 5G", "price": "299.00", "stock": 25, "category_id": 1 }
+{ "name": "iPhone 13 Pro", "price": "1099.00", "stock": 32, "category_id": 1 }
 ```
+
+#### Product pictures
+
+A product can get a picture from either of two model fields:
+
+| Field | Used for |
+| --- | --- |
+| `image` | an uploaded file, served from `MEDIA_ROOT` |
+| `image_url` | a link to a picture hosted elsewhere |
+
+Responses collapse both into a single read-only **`image`** key, so a client
+never has to decide which one to read. Writes use `image_upload` (a file) or
+`image_url` (a link):
+
+```jsonc
+// PATCH /api/products/1/   — point at a hosted picture
+{ "image_url": "https://cdn.example.com/iphone-13-pro.webp" }
+```
+
+An uploaded file takes precedence over `image_url`, so adding a real photo
+later replaces the seeded link rather than hiding behind it, and upload URLs
+are returned absolute because the frontend runs on a different origin.
+
+The seeded catalog uses `image_url`: hosts such as Render wipe the filesystem
+on every deploy, so uploaded files would vanish and leave the shop
+imageless.
 
 ### Orders — `/api/orders/`
 
@@ -156,7 +195,7 @@ something that happened.
 Ordering more than the available stock returns 400 and leaves stock untouched:
 
 ```json
-{ "quantity": ["Only 3 unit(s) of 'Galaxy S Ultra' are in stock."] }
+{ "quantity": ["Only 3 unit(s) of 'iPhone 13 Pro' are in stock."] }
 ```
 
 A successful order reduces the product's stock by the ordered quantity.
@@ -180,12 +219,12 @@ python manage.py test orders       # one app
 python manage.py test orders.tests.CreateOrderTests.test_successful_order_reduces_stock
 ```
 
-60 tests run against a throwaway database, so they never touch `db.sqlite3`.
+70 tests run against a throwaway database, so they never touch `db.sqlite3`.
 
 | File | Covers |
 | --- | --- |
 | `accounts/tests.py` | registration (hashing, weak and duplicate usernames), login, the identical message for wrong password vs unknown user, `me`, token invalidation on logout |
-| `catalog/tests.py` | category and product CRUD, read-public / write-authenticated, every filter, search, ordering and pagination parameter, and the 409 on deleting something an order references |
+| `catalog/tests.py` | category and product CRUD, read-public / write-authenticated, every filter, search, ordering and pagination parameter, the 409 on deleting something an order references, and how a product's picture is resolved |
 | `orders/tests.py` | server-calculated prices, stock decrement, every stock-validation path, the price snapshot, order isolation between users, and 405 on editing an order |
 
 The ones worth reading first are the behaviours that are easy to get wrong:
@@ -228,6 +267,10 @@ Things that were a deliberate choice rather than the obvious default:
   returns 404 rather than 403 — that way order ids are not leaked either.
 - **Login failures return one message** for both a wrong password and an
   unknown username, so the endpoint cannot be used to discover accounts.
+- **Pictures are referenced by URL, not uploaded**, in the seeded catalog.
+  `Product.image` (upload) still exists and wins when set, but a deploy on an
+  ephemeral filesystem would delete uploaded files, so the sample data uses
+  `Product.image_url` and the serializer resolves whichever is present.
 
 ## Configuration
 
