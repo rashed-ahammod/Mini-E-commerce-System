@@ -34,6 +34,14 @@ class CategoryBriefSerializer(serializers.ModelSerializer):
         fields = ["id", "name"]
 
 
+class ProductBriefSerializer(serializers.ModelSerializer):
+    """Compact product, nested inside order responses."""
+
+    class Meta:
+        model = Product
+        fields = ["id", "name", "price", "image"]
+
+
 class ProductSerializer(serializers.ModelSerializer):
     """Products.
 
