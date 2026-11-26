@@ -12,10 +12,12 @@ from django.conf.urls.static import static
 from django.contrib import admin
 from django.urls import include, path
 
-from config.views import api_root
+from config.views import api_root, health_check
 
 urlpatterns = [
     path("admin/", admin.site.urls),
+    # Liveness probe for the hosting platform; not part of the public API.
+    path("healthz/", health_check, name="health-check"),
     path("api/", api_root, name="api-root"),
     path("api/auth/", include("accounts.urls")),
     path("api/", include("catalog.urls")),

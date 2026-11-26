@@ -260,6 +260,10 @@ if not DEBUG:
     # Django thinks every request is plain HTTP and redirects forever.
     SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
     SECURE_SSL_REDIRECT = env_bool("DJANGO_SECURE_SSL_REDIRECT", True)
+    # The platform's own health check reaches the container over plain HTTP,
+    # with no X-Forwarded-Proto header, so without this exemption it would be
+    # answered with a 301 and the service would be reported unhealthy.
+    SECURE_REDIRECT_EXEMPT = [r"^healthz/?$"]
 
     SESSION_COOKIE_SECURE = True
     CSRF_COOKIE_SECURE = True

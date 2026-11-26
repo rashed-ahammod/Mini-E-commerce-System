@@ -27,9 +27,20 @@ if [ "$SEED_DATA" = "true" ]; then
 fi
 
 # Optional admin account. Django's createsuperuser reads these three
-# environment variables when given --no-input. It fails if the user already
-# exists, which is expected on later deploys, so that case is ignored.
-if [ -n "$DJANGO_SUPERUSER_USERNAME" ] && [ -n "$DJANGO_SUPERUSER_PASSWORD" ]; then
-  echo "Ensuring the superuser exists..."
-  python manage.py createsuperuser --no-input || echo "Superuser already exists, skipping."
+# environment variables when given --no-input, and ALL THREE are required:
+# with the email missing it exits with "You must use --email with --noinput",
+# which would otherwise be mistaken for "the user already exists" and leave
+# you without an admin account.
+if [ -n "$DJANGO_SUPERUSER_USERNAME" ] || [ -n "$DJANGO_SUPERUSER_PASSWORD" ]; then
+  if [ -z "$DJANGO_SUPERUSER_USERNAME" ] || [ -z "$DJANGO_SUPERUSER_EMAIL" ] || [ -z "$DJANGO_SUPERUSER_PASSWORD" ]; then
+    echo "WARNING: skipping superuser creation."
+    echo "         Set all three of DJANGO_SUPERUSER_USERNAME,"
+    echo "         DJANGO_SUPERUSER_EMAIL and DJANGO_SUPERUSER_PASSWORD."
+  else
+    echo "Ensuring the superuser exists..."
+    # Fails when the account is already there, which is normal on every
+    # deploy after the first, so that case is reported and ignored.
+    python manage.py createsuperuser --no-input \
+      || echo "Superuser '$DJANGO_SUPERUSER_USERNAME' already exists; leaving it as it is."
+  fi
 fi

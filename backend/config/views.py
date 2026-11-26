@@ -8,6 +8,23 @@ from rest_framework.reverse import reverse
 
 @api_view(["GET"])
 @permission_classes([AllowAny])
+def health_check(request):
+    """GET /healthz/ — a liveness probe for the hosting platform.
+
+    Deliberately does no database work. Render restarts a service whose
+    health check fails, and Neon pauses an idle database: a probe that
+    waited on a cold database could report the service as dead while it is
+    merely waiting, and get it restarted in a loop.
+
+    It is also exempt from the HTTPS redirect (SECURE_REDIRECT_EXEMPT in
+    settings), because an internal probe arrives over plain HTTP and would
+    otherwise be answered with a 301 rather than a 200.
+    """
+    return Response({"status": "ok"})
+
+
+@api_view(["GET"])
+@permission_classes([AllowAny])
 def api_root(request):
     """GET /api/ — an index of the available endpoints."""
     return Response(

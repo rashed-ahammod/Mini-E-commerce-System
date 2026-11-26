@@ -143,7 +143,7 @@ Render dashboard → **New → Web Service**, then:
 | Runtime | Python 3 |
 | Build Command | `./render-build.sh` |
 | Start Command | `gunicorn config.wsgi:application --bind 0.0.0.0:$PORT --workers 2 --log-file -` |
-| Health Check Path | `/api/` |
+| Health Check Path | `/healthz/` |
 
 ### Environment variables
 
@@ -174,6 +174,7 @@ have to happen during the build rather than afterwards.
 ### Verify
 
 ```bash
+curl https://<your-service>.onrender.com/healthz/      # {"status": "ok"}
 curl https://<your-service>.onrender.com/api/
 curl "https://<your-service>.onrender.com/api/products/?search=phone&ordering=price"
 ```
