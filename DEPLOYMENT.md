@@ -152,7 +152,7 @@ Render dashboard → **New → Web Service**, then:
 | `DJANGO_SECRET_KEY` | a generated secret — **required**, the app refuses to boot without it |
 | `DJANGO_DEBUG` | `False` |
 | `DATABASE_URL` | the Neon connection string, including `?sslmode=require` |
-| `CORS_ALLOWED_ORIGINS` | the Vercel URL, e.g. `https://mini-ecommerce.vercel.app` |
+| `CORS_ALLOWED_ORIGINS` | the Vercel URL, e.g. `https://mini-e-commerce-system-one.vercel.app` |
 | `PYTHON_VERSION` | `3.13.5` |
 | `SEED_DATA` | `true` for the first deploy, then `false` |
 | `DJANGO_SUPERUSER_USERNAME` / `_EMAIL` / `_PASSWORD` | optional, creates an admin during the build |

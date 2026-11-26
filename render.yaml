@@ -59,7 +59,7 @@ services:
       - key: DJANGO_DB_DISABLE_SERVER_SIDE_CURSORS
         value: "False"
 
-      # The deployed Vercel URL, e.g. https://mini-ecommerce.vercel.app
+      # The deployed Vercel URL, e.g. https://mini-e-commerce-system-one.vercel.app
       # Set it after the frontend's first deploy.
       - key: CORS_ALLOWED_ORIGINS
         sync: false

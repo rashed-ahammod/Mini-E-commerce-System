@@ -4,6 +4,10 @@ Django 5 + Django REST Framework API covering categories, products
 (with filtering, search, ordering and pagination), token authentication
 and orders.
 
+**Deployed:** <https://mini-ecommerce-api-alnq.onrender.com/api/> (Render,
+with PostgreSQL on Neon). The first request after a quiet period takes about
+50 seconds while the free instance wakes up.
+
 ## Project layout
 
 ```

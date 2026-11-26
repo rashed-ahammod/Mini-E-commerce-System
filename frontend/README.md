@@ -3,6 +3,9 @@
 React 19 + Vite 7 + React Router 7, in plain JavaScript with no UI framework.
 It consumes the Django REST API in [`../backend`](../backend).
 
+**Deployed:** <https://mini-e-commerce-system-one.vercel.app> (Vercel), talking
+to the API on Render. Sign in with `demo` / `demo12345`.
+
 ## Running it
 
 The backend must be running first (see [../backend/README.md](../backend/README.md)).
@@ -107,7 +110,7 @@ Render backend, are in [../DEPLOYMENT.md](../DEPLOYMENT.md).
    output directory come from [`vercel.json`](vercel.json).
 3. Add the environment variable `VITE_API_BASE_URL`, pointing at the deployed
    Render API with `/api` and no trailing slash, e.g.
-   `https://mini-ecommerce-api.onrender.com/api`.
+   `https://mini-ecommerce-api-alnq.onrender.com/api`.
 4. After deploying, add the Vercel URL to `CORS_ALLOWED_ORIGINS` on the
    backend, or the browser blocks every request.
 
@@ -126,7 +129,7 @@ under `/assets/` permanently.
 Check a production build locally before pushing:
 
 ```bash
-VITE_API_BASE_URL=https://your-api.onrender.com/api npm run build
+VITE_API_BASE_URL=https://mini-ecommerce-api-alnq.onrender.com/api npm run build
 npm run preview
 ```
 

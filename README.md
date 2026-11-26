@@ -11,14 +11,49 @@ look at your order history.
 ```
 ┌─────────────────────────┐        HTTP + token auth        ┌──────────────────────────┐
 │  React frontend (Vite)  │ ──────────────────────────────▶ │  Django REST Framework   │
-│  localhost:5173         │ ◀────────────────────────────── │  localhost:8000/api/     │
-└─────────────────────────┘           JSON                  └───────────┬──────────────┘
+│  dev:  localhost:5173   │ ◀────────────────────────────── │  dev:  localhost:8000    │
+│  live: Vercel           │           JSON                  │  live: Render            │
+└─────────────────────────┘                                 └───────────┬──────────────┘
                                                                         │
                                                             ┌───────────▼──────────────┐
-                                                            │  SQLite (dev)            │
-                                                            │  PostgreSQL (production) │
+                                                            │  dev:  SQLite            │
+                                                            │  live: PostgreSQL (Neon) │
                                                             └──────────────────────────┘
 ```
+
+## Live demo
+
+| | URL |
+| --- | --- |
+| **Shop (frontend)** | <https://mini-e-commerce-system-one.vercel.app> |
+| **API** | <https://mini-ecommerce-api-alnq.onrender.com/api/> |
+| **Admin** | <https://mini-ecommerce-api-alnq.onrender.com/admin/> |
+
+Sign in to the shop with the sample account:
+
+```
+username: demo
+password: demo12345
+```
+
+> **The first request takes about 50 seconds.** The API runs on Render's free
+> tier, which spins the service down after ~15 minutes of inactivity. The
+> catalog will sit on "Loading products…" while it wakes up; everything is
+> immediate after that. Opening the API URL first gets the wake-up out of the
+> way.
+
+Things worth trying:
+
+- search for `phone`, filter by category or price, sort by price — every one
+  of those is done by the API, and the query string updates, so a filtered
+  view can be shared as a link
+- add something to the cart and check out — the order appears under
+  **My orders**, and the product's stock goes down
+- try to order more units than are in stock, and the server refuses with the
+  exact quantity available
+
+Hosting: React on Vercel, Django on Render, PostgreSQL on Neon. The admin
+account is not published; the setup is described in [DEPLOYMENT.md](DEPLOYMENT.md).
 
 ## Repository layout
 
@@ -141,6 +176,11 @@ curl -X POST http://127.0.0.1:8000/api/orders/ \
 Import both files from [`postman/`](postman), select the "Mini E-commerce -
 Local" environment, and run **Auth / Login** once — a test script stores the
 token, so every protected request then works.
+
+To run the collection against the deployed API instead, change the
+environment's `base_url` to
+`https://mini-ecommerce-api-alnq.onrender.com/api` — nothing else needs to
+change, since no request has a hardcoded host.
 
 No request has a hardcoded id (test scripts capture them), and the delete
 requests only touch objects the collection itself created, so the whole
