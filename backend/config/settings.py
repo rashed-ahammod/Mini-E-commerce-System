@@ -9,6 +9,7 @@ development and in production. See `.env.example` for the full list.
 from pathlib import Path
 
 import dj_database_url
+from django.core.exceptions import ImproperlyConfigured
 from dotenv import load_dotenv
 
 import os
@@ -37,12 +38,33 @@ def env_list(name: str, default: str = "") -> list[str]:
 # Core
 # --------------------------------------------------------------------------
 
-SECRET_KEY = os.getenv("DJANGO_SECRET_KEY", "dev-insecure-key-change-me")
 DEBUG = env_bool("DJANGO_DEBUG", True)
+
+DEV_SECRET_KEY = "dev-insecure-key-change-me"
+SECRET_KEY = os.getenv("DJANGO_SECRET_KEY", DEV_SECRET_KEY)
+
+# Refuse to start a production server with the development key rather than
+# serve signed cookies and tokens that anyone reading this repository could
+# forge. Generate one with:
+#   python -c "from django.core.management.utils import get_random_secret_key as k; print(k())"
+if not DEBUG and SECRET_KEY == DEV_SECRET_KEY:
+    raise ImproperlyConfigured(
+        "DJANGO_SECRET_KEY must be set to a real secret when DJANGO_DEBUG is off."
+    )
+
 ALLOWED_HOSTS = env_list("DJANGO_ALLOWED_HOSTS", "localhost,127.0.0.1")
 
 # Needed when the API is served over HTTPS behind a proxy (deployment).
 CSRF_TRUSTED_ORIGINS = env_list("DJANGO_CSRF_TRUSTED_ORIGINS")
+
+# Render sets RENDER_EXTERNAL_HOSTNAME to the service's own hostname
+# (e.g. mini-ecommerce-api.onrender.com). Trusting it here means the
+# deployed URL never has to be copied into the dashboard by hand, and it
+# keeps working if the service is renamed.
+RENDER_EXTERNAL_HOSTNAME = os.getenv("RENDER_EXTERNAL_HOSTNAME")
+if RENDER_EXTERNAL_HOSTNAME:
+    ALLOWED_HOSTS.append(RENDER_EXTERNAL_HOSTNAME)
+    CSRF_TRUSTED_ORIGINS.append(f"https://{RENDER_EXTERNAL_HOSTNAME}")
 
 
 # --------------------------------------------------------------------------
@@ -112,7 +134,15 @@ WSGI_APPLICATION = "config.wsgi.application"
 DATABASES = {
     "default": dj_database_url.parse(
         os.getenv("DATABASE_URL", f"sqlite:///{BASE_DIR / 'db.sqlite3'}"),
-        conn_max_age=600,
+        # Reuse connections instead of opening one per request. Set
+        # DJANGO_DB_CONN_MAX_AGE=0 for a serverless Postgres that suspends
+        # when idle (Neon, Supabase pooler), where a kept-open connection can
+        # go stale between requests.
+        conn_max_age=int(os.getenv("DJANGO_DB_CONN_MAX_AGE", "600")),
+        # Check a reused connection is still usable before handing it to a
+        # view, so a dropped connection becomes a retry rather than a 500.
+        conn_health_checks=True,
+        ssl_require=env_bool("DJANGO_DB_SSL_REQUIRE", False),
     )
 }
 
@@ -192,10 +222,44 @@ REST_FRAMEWORK = {
 
 
 # --------------------------------------------------------------------------
-# CORS (the React frontend runs on a different origin during development)
+# CORS (the React frontend is served from a different origin)
 # --------------------------------------------------------------------------
+# Locally that is the Vite dev server; in production it is the Vercel
+# deployment. Browsers block any origin not listed here.
 
 CORS_ALLOWED_ORIGINS = env_list(
     "CORS_ALLOWED_ORIGINS",
     "http://localhost:5173,http://127.0.0.1:5173",
 )
+
+# Vercel gives every preview deployment its own URL, so they cannot be listed
+# one by one. A regex can cover them, but it must be anchored and scoped to
+# your own project — a pattern like `\.vercel\.app$` would let any site
+# hosted on Vercel call this API from a visitor's browser. For example:
+#   ^https://mini-ecommerce-[a-z0-9-]+\.vercel\.app$
+CORS_ALLOWED_ORIGIN_REGEXES = env_list("CORS_ALLOWED_ORIGIN_REGEXES")
+
+
+# --------------------------------------------------------------------------
+# Production hardening
+# --------------------------------------------------------------------------
+# Only applied when DEBUG is off, so local development over plain HTTP is
+# unaffected. `manage.py check --deploy` reports on these.
+
+if not DEBUG:
+    # Most hosts terminate TLS at a proxy and forward this header; without it
+    # Django thinks every request is plain HTTP and redirects forever.
+    SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+    SECURE_SSL_REDIRECT = env_bool("DJANGO_SECURE_SSL_REDIRECT", True)
+
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+
+    # Start HSTS at one hour. Raise it deliberately once HTTPS is confirmed
+    # working - a long max-age is hard to undo in visitors' browsers.
+    SECURE_HSTS_SECONDS = int(os.getenv("DJANGO_HSTS_SECONDS", "3600"))
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = env_bool("DJANGO_HSTS_INCLUDE_SUBDOMAINS", False)
+    SECURE_HSTS_PRELOAD = False
+
+    SECURE_CONTENT_TYPE_NOSNIFF = True
+    X_FRAME_OPTIONS = "DENY"

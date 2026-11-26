@@ -1,0 +1,90 @@
+# Render Blueprint — creates the API service and its database in one go.
+#
+# Use it with Render's "New → Blueprint" and point it at this repository.
+# Everything below can also be configured by hand in the dashboard; the file
+# just makes it reproducible.
+#
+# DATABASE NOTE
+# A Free Render Postgres instance expires 30 days after it is created, then
+# gives you a 14-day grace period before the data is deleted. That is fine
+# while developing, but if this project has to stay reachable for longer
+# (a submitted assignment, a portfolio link), use an external Postgres with
+# no expiry instead — see the "Alternative" comment under `databases` below.
+
+services:
+  - type: web
+    name: mini-ecommerce-api
+    runtime: python
+    plan: free
+    # The Django project is not at the repository root.
+    rootDir: backend
+    buildCommand: "./render-build.sh"
+    startCommand: "gunicorn config.wsgi:application --bind 0.0.0.0:$PORT --workers 2 --log-file -"
+    # GET /api/ is public and cheap, so Render can use it to tell whether the
+    # service is alive.
+    healthCheckPath: /api/
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.13.5"
+
+      # Generated once by Render and kept secret. settings.py refuses to boot
+      # with the development key when DEBUG is off, so this must exist.
+      - key: DJANGO_SECRET_KEY
+        generateValue: true
+
+      - key: DJANGO_DEBUG
+        value: "False"
+
+      # ALLOWED_HOSTS and CSRF_TRUSTED_ORIGINS pick up Render's own
+      # RENDER_EXTERNAL_HOSTNAME automatically (see config/settings.py), so
+      # the service URL does not have to be copied in by hand.
+
+      - key: DATABASE_URL
+        fromDatabase:
+          name: mini-ecommerce-db
+          property: connectionString
+
+      # The deployed Vercel URL, e.g. https://mini-ecommerce.vercel.app
+      # `sync: false` means Render asks for the value instead of storing it
+      # in this file. Set it after the frontend's first deploy.
+      - key: CORS_ALLOWED_ORIGINS
+        sync: false
+
+      # Optional. A regex for Vercel preview URLs, which change per commit.
+      # Keep it scoped to your own project name, never a bare .vercel.app
+      # pattern, or any site on vercel.app could call this API from a
+      # visitor's browser. Example:
+      #   ^https://mini-ecommerce-[a-z0-9-]+\.vercel\.app$
+      - key: CORS_ALLOWED_ORIGIN_REGEXES
+        sync: false
+
+      # Set to "true" for the first deploy to load the sample catalog, then
+      # back to "false". The seed command is safe to run repeatedly.
+      - key: SEED_DATA
+        value: "false"
+
+      # Optional: fill all three to have the build create an admin account,
+      # since the Free plan has no shell to run createsuperuser in.
+      - key: DJANGO_SUPERUSER_USERNAME
+        sync: false
+      - key: DJANGO_SUPERUSER_EMAIL
+        sync: false
+      - key: DJANGO_SUPERUSER_PASSWORD
+        sync: false
+
+databases:
+  - name: mini-ecommerce-db
+    plan: free
+    databaseName: mini_ecommerce
+    user: mini_ecommerce
+
+# Alternative: external Postgres with no 30-day expiry (Neon, Supabase, ...).
+# Delete the whole `databases:` block above, and replace the DATABASE_URL
+# entry in envVars with:
+#
+#   - key: DATABASE_URL
+#     sync: false
+#
+# then paste the provider's connection string into the Render dashboard.
+# Nothing in the application code changes: settings.py reads DATABASE_URL
+# whatever it points at.
