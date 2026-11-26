@@ -1,0 +1,451 @@
+{
+  "info": {
+    "name": "Mini E-commerce REST API",
+    "description": "Every endpoint of the Mini E-commerce API.\n\nSetup\n1. Start the backend: `python manage.py runserver`\n2. Load sample data: `python manage.py seed_data --demo-user`\n3. Import this collection and Mini-Ecommerce.postman_environment.json, then select the \"Mini E-commerce - Local\" environment (top right).\n4. Run \"Auth / Login\" once. A test script stores the token in the `token` environment variable, so every protected request below works without copying anything by hand.\n\nNo request has a hardcoded id. Test scripts save ids into environment variables:\n- `category_id` / `product_id`: the first item returned by the list endpoints\n- `new_category_id` / `new_product_id`: objects this collection creates, which are the only ones the delete requests touch\n- `order_id`: the order created by \"Orders / Create order\"\n\nBecause of that the whole collection can be executed top to bottom with the Collection Runner. \"Auth / Logout\" is deliberately last, since it invalidates the token.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "base_url", "value": "http://127.0.0.1:8000/api" }
+  ],
+  "item": [
+    {
+      "name": "API root",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": { "raw": "{{base_url}}/", "host": ["{{base_url}}"], "path": [""] },
+        "description": "Index of every endpoint. A good first request to confirm the server is up."
+      }
+    },
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "Register",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// 201 on a new account, 400 if this username already exists.",
+                  "if (pm.response.code === 201) {",
+                  "  pm.environment.set('token', pm.response.json().token);",
+                  "  console.log('Registered, token saved.');",
+                  "} else {",
+                  "  console.log('Register returned ' + pm.response.code + ' - run Login instead.');",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{base_url}}/auth/register/", "host": ["{{base_url}}"], "path": ["auth", "register", ""] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"testuser\",\n  \"email\": \"testuser@example.com\",\n  \"password\": \"StrongPass!234\"\n}"
+            },
+            "description": "Create an account. Responds 201 with {token, user}. Passwords run through Django's validators, so a short or common password returns 400 listing exactly what is wrong. Running this a second time returns 400 (username taken) - use Login after that."
+          }
+        },
+        {
+          "name": "Login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));",
+                  "pm.environment.set('token', pm.response.json().token);",
+                  "console.log('Token saved to the environment.');"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{base_url}}/auth/login/", "host": ["{{base_url}}"], "path": ["auth", "login", ""] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"demo\",\n  \"password\": \"demo12345\"\n}"
+            },
+            "description": "Exchange credentials for a token. The demo account comes from `python manage.py seed_data --demo-user`. A wrong password and an unknown username return the same 400 message on purpose, so the endpoint cannot be used to discover usernames."
+          }
+        },
+        {
+          "name": "Me (current user)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Token {{token}}" }],
+            "url": { "raw": "{{base_url}}/auth/me/", "host": ["{{base_url}}"], "path": ["auth", "me", ""] },
+            "description": "Returns the user the token belongs to. 401 without a valid token. The frontend calls this on startup to check a stored token is still good."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Categories",
+      "item": [
+        {
+          "name": "List categories",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));",
+                  "const results = pm.response.json().results;",
+                  "if (results.length) {",
+                  "  pm.environment.set('category_id', results[0].id);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{base_url}}/categories/", "host": ["{{base_url}}"], "path": ["categories", ""] },
+            "description": "Public. Paginated, with product_count on each category. Supports ?search= and ?ordering=name or created_at."
+          }
+        },
+        {
+          "name": "Single category",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{base_url}}/categories/{{category_id}}/", "host": ["{{base_url}}"], "path": ["categories", "{{category_id}}", ""] },
+            "description": "Public. Uses the id saved by \"List categories\"."
+          }
+        },
+        {
+          "name": "Create category",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 201', () => pm.response.to.have.status(201));",
+                  "pm.environment.set('new_category_id', pm.response.json().id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Token {{token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": { "raw": "{{base_url}}/categories/", "host": ["{{base_url}}"], "path": ["categories", ""] },
+            "body": { "mode": "raw", "raw": "{\n  \"name\": \"Cameras\",\n  \"description\": \"Mirrorless and DSLR cameras\"\n}" },
+            "description": "Requires a token; returns 401 without one. Category names are unique, so running this twice returns 400."
+          }
+        },
+        {
+          "name": "Update category",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Authorization", "value": "Token {{token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": { "raw": "{{base_url}}/categories/{{new_category_id}}/", "host": ["{{base_url}}"], "path": ["categories", "{{new_category_id}}", ""] },
+            "body": { "mode": "raw", "raw": "{\n  \"name\": \"Cameras & Lenses\",\n  \"description\": \"Updated description\"\n}" },
+            "description": "Full update. Use PATCH with only the changed fields for a partial update."
+          }
+        },
+        {
+          "name": "Delete category",
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Authorization", "value": "Token {{token}}" }],
+            "url": { "raw": "{{base_url}}/categories/{{new_category_id}}/", "host": ["{{base_url}}"], "path": ["categories", "{{new_category_id}}", ""] },
+            "description": "Deletes the category this collection created, so the seeded data stays intact. 204 on success, 409 if one of its products belongs to an existing order."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Products",
+      "item": [
+        {
+          "name": "List products",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('response is paginated', () => {",
+                  "  pm.expect(pm.response.json()).to.have.property('count');",
+                  "});",
+                  "const results = pm.response.json().results;",
+                  "if (results.length) {",
+                  "  pm.environment.set('product_id', results[0].id);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{base_url}}/products/", "host": ["{{base_url}}"], "path": ["products", ""] },
+            "description": "Public, paginated 10 per page. The response has count, next, previous and results."
+          }
+        },
+        {
+          "name": "Search by name (?search=phone)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/products/?search=phone",
+              "host": ["{{base_url}}"],
+              "path": ["products", ""],
+              "query": [{ "key": "search", "value": "phone" }]
+            },
+            "description": "Case-insensitive match on name and description."
+          }
+        },
+        {
+          "name": "Filter by category (?category=)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/products/?category={{category_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["products", ""],
+              "query": [{ "key": "category", "value": "{{category_id}}" }]
+            },
+            "description": "Filter by category id. ?category_name=phones filters by name instead."
+          }
+        },
+        {
+          "name": "Filter by price range",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/products/?min_price=100&max_price=500",
+              "host": ["{{base_url}}"],
+              "path": ["products", ""],
+              "query": [
+                { "key": "min_price", "value": "100" },
+                { "key": "max_price", "value": "500" }
+              ]
+            },
+            "description": "?price=149.50 also works as an exact match."
+          }
+        },
+        {
+          "name": "Order by price (?ordering=price)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/products/?ordering=price",
+              "host": ["{{base_url}}"],
+              "path": ["products", ""],
+              "query": [{ "key": "ordering", "value": "price" }]
+            },
+            "description": "Use -price for most expensive first. name, created_at and stock are also allowed."
+          }
+        },
+        {
+          "name": "Pagination (?page=2&page_size=5)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/products/?page=2&page_size=5",
+              "host": ["{{base_url}}"],
+              "path": ["products", ""],
+              "query": [
+                { "key": "page", "value": "2" },
+                { "key": "page_size", "value": "5" }
+              ]
+            },
+            "description": "page_size is capped at 100. Asking for a page past the end returns 404."
+          }
+        },
+        {
+          "name": "Combined filter + search + ordering",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/products/?search=phone&in_stock=true&ordering=-price",
+              "host": ["{{base_url}}"],
+              "path": ["products", ""],
+              "query": [
+                { "key": "search", "value": "phone" },
+                { "key": "in_stock", "value": "true" },
+                { "key": "ordering", "value": "-price" }
+              ]
+            },
+            "description": "All query parameters can be combined; add &category={{category_id}} to narrow it further."
+          }
+        },
+        {
+          "name": "Product details",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{base_url}}/products/{{product_id}}/", "host": ["{{base_url}}"], "path": ["products", "{{product_id}}", ""] },
+            "description": "Uses the id saved by \"List products\"."
+          }
+        },
+        {
+          "name": "Create product",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 201', () => pm.response.to.have.status(201));",
+                  "pm.environment.set('new_product_id', pm.response.json().id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Token {{token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": { "raw": "{{base_url}}/products/", "host": ["{{base_url}}"], "path": ["products", ""] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Test Product\",\n  \"description\": \"Created from Postman\",\n  \"price\": \"199.99\",\n  \"stock\": 10,\n  \"category_id\": {{category_id}}\n}"
+            },
+            "description": "The write field is category_id (a plain id), while responses return a nested category object. An unknown category_id or a negative price returns 400 naming the field."
+          }
+        },
+        {
+          "name": "Update product (PATCH)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Authorization", "value": "Token {{token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": { "raw": "{{base_url}}/products/{{new_product_id}}/", "host": ["{{base_url}}"], "path": ["products", "{{new_product_id}}", ""] },
+            "body": { "mode": "raw", "raw": "{\n  \"price\": \"179.99\",\n  \"stock\": 25\n}" },
+            "description": "PATCH sends only the changed fields; PUT would require the whole object."
+          }
+        },
+        {
+          "name": "Delete product",
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Authorization", "value": "Token {{token}}" }],
+            "url": { "raw": "{{base_url}}/products/{{new_product_id}}/", "host": ["{{base_url}}"], "path": ["products", "{{new_product_id}}", ""] },
+            "description": "Deletes the product this collection created. 204 on success, 409 if the product belongs to an existing order."
+          }
+        },
+        {
+          "name": "Create product - unauthenticated (401)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{base_url}}/products/", "host": ["{{base_url}}"], "path": ["products", ""] },
+            "body": { "mode": "raw", "raw": "{\n  \"name\": \"Should not be created\",\n  \"price\": \"1.00\",\n  \"stock\": 1,\n  \"category_id\": {{category_id}}\n}" },
+            "description": "Deliberately sends no Authorization header. Expected: 401. Reading is public, writing is not."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Orders",
+      "item": [
+        {
+          "name": "Create order",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 201', () => pm.response.to.have.status(201));",
+                  "pm.environment.set('order_id', pm.response.json().id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Token {{token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": { "raw": "{{base_url}}/orders/", "host": ["{{base_url}}"], "path": ["orders", ""] },
+            "body": { "mode": "raw", "raw": "{\n  \"product_id\": {{product_id}},\n  \"quantity\": 2\n}" },
+            "description": "Only product_id and quantity are sent. The user comes from the token, and unit_price and total_price are calculated on the server - sending them has no effect. The product's stock is reduced by the quantity."
+          }
+        },
+        {
+          "name": "Create order - not enough stock (400)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Token {{token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": { "raw": "{{base_url}}/orders/", "host": ["{{base_url}}"], "path": ["orders", ""] },
+            "body": { "mode": "raw", "raw": "{\n  \"product_id\": {{product_id}},\n  \"quantity\": 99999\n}" },
+            "description": "Expected: 400 with a message naming how many units are available. Stock is left untouched."
+          }
+        },
+        {
+          "name": "Create order - unauthenticated (401)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{base_url}}/orders/", "host": ["{{base_url}}"], "path": ["orders", ""] },
+            "body": { "mode": "raw", "raw": "{\n  \"product_id\": {{product_id}},\n  \"quantity\": 1\n}" },
+            "description": "Deliberately sends no Authorization header. Expected: 401."
+          }
+        },
+        {
+          "name": "My orders",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Token {{token}}" }],
+            "url": { "raw": "{{base_url}}/orders/", "host": ["{{base_url}}"], "path": ["orders", ""] },
+            "description": "Only the token owner's orders, newest first, paginated."
+          }
+        },
+        {
+          "name": "Single order",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Token {{token}}" }],
+            "url": { "raw": "{{base_url}}/orders/{{order_id}}/", "host": ["{{base_url}}"], "path": ["orders", "{{order_id}}", ""] },
+            "description": "Another user's order id returns 404, not 403, so order ids are not leaked."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Auth / Logout (run last)",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Authorization", "value": "Token {{token}}" }],
+        "url": { "raw": "{{base_url}}/auth/logout/", "host": ["{{base_url}}"], "path": ["auth", "logout", ""] },
+        "description": "Deletes the token server side. 204 on success, and every later request with that token returns 401 - which is why this sits at the end of the collection. Run Login again to get a new token."
+      }
+    }
+  ]
+}
