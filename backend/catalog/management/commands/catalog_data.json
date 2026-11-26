@@ -1,0 +1,381 @@
+[
+  {
+    "name": "Smartphones",
+    "description": "Flagship and everyday Android and iOS phones.",
+    "products": [
+      {
+        "name": "iPhone 5s",
+        "description": "The iPhone 5s is a classic smartphone known for its compact design and advanced features during its release. While it's an older model, it still provides a reliable user experience.",
+        "price": "199.99",
+        "stock": 25,
+        "image_url": "https://cdn.dummyjson.com/product-images/smartphones/iphone-5s/thumbnail.webp"
+      },
+      {
+        "name": "iPhone 6",
+        "description": "The iPhone 6 is a stylish and capable smartphone with a larger display and improved performance. It introduced new features and design elements, making it a popular choice in its time.",
+        "price": "299.99",
+        "stock": 60,
+        "image_url": "https://cdn.dummyjson.com/product-images/smartphones/iphone-6/thumbnail.webp"
+      },
+      {
+        "name": "iPhone 13 Pro",
+        "description": "The iPhone 13 Pro is a cutting-edge smartphone with a powerful camera system, high-performance chip, and stunning display. It offers advanced features for users who demand top-notch technology.",
+        "price": "1099.99",
+        "stock": 56,
+        "image_url": "https://cdn.dummyjson.com/product-images/smartphones/iphone-13-pro/thumbnail.webp"
+      },
+      {
+        "name": "iPhone X",
+        "description": "The iPhone X is a flagship smartphone featuring a bezel-less OLED display, facial recognition technology (Face ID), and impressive performance. It represents a milestone in iPhone design and innovation.",
+        "price": "899.99",
+        "stock": 37,
+        "image_url": "https://cdn.dummyjson.com/product-images/smartphones/iphone-x/thumbnail.webp"
+      },
+      {
+        "name": "Oppo A57",
+        "description": "The Oppo A57 is a mid-range smartphone known for its sleek design and capable features. It offers a balance of performance and affordability, making it a popular choice.",
+        "price": "249.99",
+        "stock": 19,
+        "image_url": "https://cdn.dummyjson.com/product-images/smartphones/oppo-a57/thumbnail.webp"
+      },
+      {
+        "name": "Oppo F19 Pro Plus",
+        "description": "The Oppo F19 Pro Plus is a feature-rich smartphone with a focus on camera capabilities. It boasts advanced photography features and a powerful performance for a premium user experience.",
+        "price": "399.99",
+        "stock": 78,
+        "image_url": "https://cdn.dummyjson.com/product-images/smartphones/oppo-f19-pro-plus/thumbnail.webp"
+      },
+      {
+        "name": "Oppo K1",
+        "description": "The Oppo K1 series offers a range of smartphones with various features and specifications. Known for their stylish design and reliable performance, the Oppo K1 series caters to diverse user preferences.",
+        "price": "299.99",
+        "stock": 55,
+        "image_url": "https://cdn.dummyjson.com/product-images/smartphones/oppo-k1/thumbnail.webp"
+      },
+      {
+        "name": "Realme C35",
+        "description": "The Realme C35 is a budget-friendly smartphone with a focus on providing essential features for everyday use. It offers a reliable performance and user-friendly experience.",
+        "price": "149.99",
+        "stock": 48,
+        "image_url": "https://cdn.dummyjson.com/product-images/smartphones/realme-c35/thumbnail.webp"
+      },
+      {
+        "name": "Realme X",
+        "description": "The Realme X is a mid-range smartphone known for its sleek design and impressive display. It offers a good balance of performance and camera capabilities for users seeking a quality device.",
+        "price": "299.99",
+        "stock": 12,
+        "image_url": "https://cdn.dummyjson.com/product-images/smartphones/realme-x/thumbnail.webp"
+      },
+      {
+        "name": "Realme XT",
+        "description": "The Realme XT is a feature-rich smartphone with a focus on camera technology. It comes equipped with advanced camera sensors, delivering high-quality photos and videos for photography enthusiasts.",
+        "price": "349.99",
+        "stock": 80,
+        "image_url": "https://cdn.dummyjson.com/product-images/smartphones/realme-xt/thumbnail.webp"
+      },
+      {
+        "name": "Samsung Galaxy S7",
+        "description": "The Samsung Galaxy S7 is a flagship smartphone known for its sleek design and advanced features. It features a high-resolution display, powerful camera, and robust performance.",
+        "price": "299.99",
+        "stock": 67,
+        "image_url": "https://cdn.dummyjson.com/product-images/smartphones/samsung-galaxy-s7/thumbnail.webp"
+      },
+      {
+        "name": "Samsung Galaxy S8",
+        "description": "The Samsung Galaxy S8 is a premium smartphone with an Infinity Display, offering a stunning visual experience. It boasts advanced camera capabilities and cutting-edge technology.",
+        "price": "499.99",
+        "stock": 0,
+        "image_url": "https://cdn.dummyjson.com/product-images/smartphones/samsung-galaxy-s8/thumbnail.webp"
+      },
+      {
+        "name": "Samsung Galaxy S10",
+        "description": "The Samsung Galaxy S10 is a flagship device featuring a dynamic AMOLED display, versatile camera system, and powerful performance. It represents innovation and excellence in smartphone technology.",
+        "price": "699.99",
+        "stock": 19,
+        "image_url": "https://cdn.dummyjson.com/product-images/smartphones/samsung-galaxy-s10/thumbnail.webp"
+      },
+      {
+        "name": "Vivo S1",
+        "description": "The Vivo S1 is a stylish and mid-range smartphone offering a blend of design and performance. It features a vibrant display, capable camera system, and reliable functionality.",
+        "price": "249.99",
+        "stock": 50,
+        "image_url": "https://cdn.dummyjson.com/product-images/smartphones/vivo-s1/thumbnail.webp"
+      },
+      {
+        "name": "Vivo V9",
+        "description": "The Vivo V9 is a smartphone known for its sleek design and emphasis on capturing high-quality selfies. It features a notch display, dual-camera setup, and a modern design.",
+        "price": "299.99",
+        "stock": 82,
+        "image_url": "https://cdn.dummyjson.com/product-images/smartphones/vivo-v9/thumbnail.webp"
+      },
+      {
+        "name": "Vivo X21",
+        "description": "The Vivo X21 is a premium smartphone with a focus on cutting-edge technology. It features an in-display fingerprint sensor, a high-resolution display, and advanced camera capabilities.",
+        "price": "499.99",
+        "stock": 0,
+        "image_url": "https://cdn.dummyjson.com/product-images/smartphones/vivo-x21/thumbnail.webp"
+      }
+    ]
+  },
+  {
+    "name": "Laptops",
+    "description": "Ultrabooks, workstations and everyday notebooks.",
+    "products": [
+      {
+        "name": "Apple MacBook Pro 14 Inch Space Grey",
+        "description": "The MacBook Pro 14 Inch in Space Grey is a powerful and sleek laptop, featuring Apple's M1 Pro chip for exceptional performance and a stunning Retina display.",
+        "price": "1999.99",
+        "stock": 24,
+        "image_url": "https://cdn.dummyjson.com/product-images/laptops/apple-macbook-pro-14-inch-space-grey/thumbnail.webp"
+      },
+      {
+        "name": "Asus Zenbook Pro Dual Screen Laptop",
+        "description": "The Asus Zenbook Pro Dual Screen Laptop is a high-performance device with dual screens, providing productivity and versatility for creative professionals.",
+        "price": "1799.99",
+        "stock": 45,
+        "image_url": "https://cdn.dummyjson.com/product-images/laptops/asus-zenbook-pro-dual-screen-laptop/thumbnail.webp"
+      },
+      {
+        "name": "Huawei Matebook X Pro",
+        "description": "The Huawei Matebook X Pro is a slim and stylish laptop with a high-resolution touchscreen display, offering a premium experience for users on the go.",
+        "price": "1399.99",
+        "stock": 75,
+        "image_url": "https://cdn.dummyjson.com/product-images/laptops/huawei-matebook-x-pro/thumbnail.webp"
+      },
+      {
+        "name": "Lenovo Yoga 920",
+        "description": "The Lenovo Yoga 920 is a 2-in-1 convertible laptop with a flexible hinge, allowing you to use it as a laptop or tablet, offering versatility and portability.",
+        "price": "1099.99",
+        "stock": 40,
+        "image_url": "https://cdn.dummyjson.com/product-images/laptops/lenovo-yoga-920/thumbnail.webp"
+      },
+      {
+        "name": "New DELL XPS 13 9300 Laptop",
+        "description": "The New DELL XPS 13 9300 Laptop is a compact and powerful device, featuring a virtually borderless InfinityEdge display and high-end performance for various tasks.",
+        "price": "1499.99",
+        "stock": 74,
+        "image_url": "https://cdn.dummyjson.com/product-images/laptops/new-dell-xps-13-9300-laptop/thumbnail.webp"
+      }
+    ]
+  },
+  {
+    "name": "Tablets",
+    "description": "Tablets for reading, drawing and light work.",
+    "products": [
+      {
+        "name": "iPad Mini 2021 Starlight",
+        "description": "The iPad Mini 2021 in Starlight is a compact and powerful tablet from Apple. Featuring a stunning Retina display, powerful A-series chip, and a sleek design, it offers a premium tablet experience.",
+        "price": "499.99",
+        "stock": 47,
+        "image_url": "https://cdn.dummyjson.com/product-images/tablets/ipad-mini-2021-starlight/thumbnail.webp"
+      },
+      {
+        "name": "Samsung Galaxy Tab S8 Plus Grey",
+        "description": "The Samsung Galaxy Tab S8 Plus in Grey is a high-performance Android tablet by Samsung. With a large AMOLED display, powerful processor, and S Pen support, it's ideal for productivity and entertainment.",
+        "price": "599.99",
+        "stock": 62,
+        "image_url": "https://cdn.dummyjson.com/product-images/tablets/samsung-galaxy-tab-s8-plus-grey/thumbnail.webp"
+      },
+      {
+        "name": "Samsung Galaxy Tab White",
+        "description": "The Samsung Galaxy Tab in White is a sleek and versatile Android tablet. With a vibrant display, long-lasting battery, and a range of features, it offers a great user experience for various tasks.",
+        "price": "349.99",
+        "stock": 92,
+        "image_url": "https://cdn.dummyjson.com/product-images/tablets/samsung-galaxy-tab-white/thumbnail.webp"
+      }
+    ]
+  },
+  {
+    "name": "Mobile Accessories",
+    "description": "Cases, chargers, cables and earbuds.",
+    "products": [
+      {
+        "name": "Amazon Echo Plus",
+        "description": "The Amazon Echo Plus is a smart speaker with built-in Alexa voice control. It features premium sound quality and serves as a hub for controlling smart home devices.",
+        "price": "99.99",
+        "stock": 61,
+        "image_url": "https://cdn.dummyjson.com/product-images/mobile-accessories/amazon-echo-plus/thumbnail.webp"
+      },
+      {
+        "name": "Apple Airpods",
+        "description": "The Apple Airpods offer a seamless wireless audio experience. With easy pairing, high-quality sound, and Siri integration, they are perfect for on-the-go listening.",
+        "price": "129.99",
+        "stock": 67,
+        "image_url": "https://cdn.dummyjson.com/product-images/mobile-accessories/apple-airpods/thumbnail.webp"
+      },
+      {
+        "name": "Apple AirPods Max Silver",
+        "description": "The Apple AirPods Max in Silver are premium over-ear headphones with high-fidelity audio, adaptive EQ, and active noise cancellation. Experience immersive sound in style.",
+        "price": "549.99",
+        "stock": 59,
+        "image_url": "https://cdn.dummyjson.com/product-images/mobile-accessories/apple-airpods-max-silver/thumbnail.webp"
+      },
+      {
+        "name": "Apple Airpower Wireless Charger",
+        "description": "The Apple AirPower Wireless Charger provides a convenient way to charge your compatible Apple devices wirelessly. Simply place your devices on the charging mat for effortless charging.",
+        "price": "79.99",
+        "stock": 1,
+        "image_url": "https://cdn.dummyjson.com/product-images/mobile-accessories/apple-airpower-wireless-charger/thumbnail.webp"
+      },
+      {
+        "name": "Apple HomePod Mini Cosmic Grey",
+        "description": "The Apple HomePod Mini in Cosmic Grey is a compact smart speaker that delivers impressive audio and integrates seamlessly with the Apple ecosystem for a smart home experience.",
+        "price": "99.99",
+        "stock": 27,
+        "image_url": "https://cdn.dummyjson.com/product-images/mobile-accessories/apple-homepod-mini-cosmic-grey/thumbnail.webp"
+      },
+      {
+        "name": "Apple iPhone Charger",
+        "description": "The Apple iPhone Charger is a high-quality charger designed for fast and efficient charging of your iPhone. Ensure your device stays powered up and ready to go.",
+        "price": "19.99",
+        "stock": 31,
+        "image_url": "https://cdn.dummyjson.com/product-images/mobile-accessories/apple-iphone-charger/thumbnail.webp"
+      },
+      {
+        "name": "Apple MagSafe Battery Pack",
+        "description": "The Apple MagSafe Battery Pack is a portable and convenient way to add extra battery life to your MagSafe-compatible iPhone. Attach it magnetically for a secure connection.",
+        "price": "99.99",
+        "stock": 1,
+        "image_url": "https://cdn.dummyjson.com/product-images/mobile-accessories/apple-magsafe-battery-pack/thumbnail.webp"
+      },
+      {
+        "name": "Apple Watch Series 4 Gold",
+        "description": "The Apple Watch Series 4 in Gold is a stylish and advanced smartwatch with features like heart rate monitoring, fitness tracking, and a beautiful Retina display.",
+        "price": "349.99",
+        "stock": 33,
+        "image_url": "https://cdn.dummyjson.com/product-images/mobile-accessories/apple-watch-series-4-gold/thumbnail.webp"
+      },
+      {
+        "name": "Beats Flex Wireless Earphones",
+        "description": "The Beats Flex Wireless Earphones offer a comfortable and versatile audio experience. With magnetic earbuds and up to 12 hours of battery life, they are ideal for everyday use.",
+        "price": "49.99",
+        "stock": 50,
+        "image_url": "https://cdn.dummyjson.com/product-images/mobile-accessories/beats-flex-wireless-earphones/thumbnail.webp"
+      },
+      {
+        "name": "iPhone 12 Silicone Case with MagSafe Plum",
+        "description": "The iPhone 12 Silicone Case with MagSafe in Plum is a stylish and protective case designed for the iPhone 12. It features MagSafe technology for easy attachment of accessories.",
+        "price": "29.99",
+        "stock": 69,
+        "image_url": "https://cdn.dummyjson.com/product-images/mobile-accessories/iphone-12-silicone-case-with-magsafe-plum/thumbnail.webp"
+      },
+      {
+        "name": "Monopod",
+        "description": "The Monopod is a versatile camera accessory for stable and adjustable shooting. Perfect for capturing selfies, group photos, and videos with ease.",
+        "price": "19.99",
+        "stock": 48,
+        "image_url": "https://cdn.dummyjson.com/product-images/mobile-accessories/monopod/thumbnail.webp"
+      },
+      {
+        "name": "Selfie Lamp with iPhone",
+        "description": "The Selfie Lamp with iPhone is a portable and adjustable LED light designed to enhance your selfies and video calls. Attach it to your iPhone for well-lit photos.",
+        "price": "14.99",
+        "stock": 58,
+        "image_url": "https://cdn.dummyjson.com/product-images/mobile-accessories/selfie-lamp-with-iphone/thumbnail.webp"
+      },
+      {
+        "name": "Selfie Stick Monopod",
+        "description": "The Selfie Stick Monopod is a extendable and foldable device for capturing the perfect selfie or group photo. Compatible with smartphones and cameras.",
+        "price": "12.99",
+        "stock": 11,
+        "image_url": "https://cdn.dummyjson.com/product-images/mobile-accessories/selfie-stick-monopod/thumbnail.webp"
+      },
+      {
+        "name": "TV Studio Camera Pedestal",
+        "description": "The TV Studio Camera Pedestal is a professional-grade camera support system for smooth and precise camera movements in a studio setting. Ideal for broadcast and production.",
+        "price": "499.99",
+        "stock": 15,
+        "image_url": "https://cdn.dummyjson.com/product-images/mobile-accessories/tv-studio-camera-pedestal/thumbnail.webp"
+      }
+    ]
+  },
+  {
+    "name": "Watches",
+    "description": "Analogue and smart watches.",
+    "products": [
+      {
+        "name": "Brown Leather Belt Watch",
+        "description": "The Brown Leather Belt Watch is a stylish timepiece with a classic design. Featuring a genuine leather strap and a sleek dial, it adds a touch of sophistication to your look.",
+        "price": "89.99",
+        "stock": 32,
+        "image_url": "https://cdn.dummyjson.com/product-images/mens-watches/brown-leather-belt-watch/thumbnail.webp"
+      },
+      {
+        "name": "Longines Master Collection",
+        "description": "The Longines Master Collection is an elegant and refined watch known for its precision and craftsmanship. With a timeless design, it's a symbol of luxury and sophistication.",
+        "price": "1499.99",
+        "stock": 100,
+        "image_url": "https://cdn.dummyjson.com/product-images/mens-watches/longines-master-collection/thumbnail.webp"
+      },
+      {
+        "name": "Rolex Cellini Date Black Dial",
+        "description": "The Rolex Cellini Date with Black Dial is a classic and prestigious watch. With a black dial and date complication, it exudes sophistication and is a symbol of Rolex's heritage.",
+        "price": "8999.99",
+        "stock": 40,
+        "image_url": "https://cdn.dummyjson.com/product-images/mens-watches/rolex-cellini-date-black-dial/thumbnail.webp"
+      },
+      {
+        "name": "Rolex Cellini Moonphase",
+        "description": "The Rolex Cellini Moonphase is a masterpiece of horology, featuring a moon phase complication and exquisite design. It reflects Rolex's commitment to precision and elegance.",
+        "price": "12999.99",
+        "stock": 36,
+        "image_url": "https://cdn.dummyjson.com/product-images/mens-watches/rolex-cellini-moonphase/thumbnail.webp"
+      },
+      {
+        "name": "Rolex Datejust",
+        "description": "The Rolex Datejust is an iconic and versatile timepiece with a date window. Known for its timeless design and reliability, it's a symbol of Rolex's watchmaking excellence.",
+        "price": "10999.99",
+        "stock": 86,
+        "image_url": "https://cdn.dummyjson.com/product-images/mens-watches/rolex-datejust/thumbnail.webp"
+      },
+      {
+        "name": "Rolex Submariner Watch",
+        "description": "The Rolex Submariner is a legendary dive watch with a rich history. Known for its durability and water resistance, it's a symbol of adventure and exploration.",
+        "price": "13999.99",
+        "stock": 55,
+        "image_url": "https://cdn.dummyjson.com/product-images/mens-watches/rolex-submariner-watch/thumbnail.webp"
+      }
+    ]
+  },
+  {
+    "name": "Sunglasses",
+    "description": "Polarised and designer eyewear.",
+    "products": [
+      {
+        "name": "Black Sun Glasses",
+        "description": "The Black Sun Glasses are a classic and stylish choice, featuring a sleek black frame and tinted lenses. They provide both UV protection and a fashionable look.",
+        "price": "29.99",
+        "stock": 60,
+        "image_url": "https://cdn.dummyjson.com/product-images/sunglasses/black-sun-glasses/thumbnail.webp"
+      },
+      {
+        "name": "Classic Sun Glasses",
+        "description": "The Classic Sun Glasses offer a timeless design with a neutral frame and UV-protected lenses. These sunglasses are versatile and suitable for various occasions.",
+        "price": "24.99",
+        "stock": 1,
+        "image_url": "https://cdn.dummyjson.com/product-images/sunglasses/classic-sun-glasses/thumbnail.webp"
+      },
+      {
+        "name": "Green and Black Glasses",
+        "description": "The Green and Black Glasses feature a bold combination of green and black colors, adding a touch of vibrancy to your eyewear collection. They are both stylish and eye-catching.",
+        "price": "34.99",
+        "stock": 24,
+        "image_url": "https://cdn.dummyjson.com/product-images/sunglasses/green-and-black-glasses/thumbnail.webp"
+      },
+      {
+        "name": "Party Glasses",
+        "description": "The Party Glasses are designed to add flair to your party outfit. With unique shapes or colorful frames, they're perfect for adding a playful touch to your look during celebrations.",
+        "price": "19.99",
+        "stock": 86,
+        "image_url": "https://cdn.dummyjson.com/product-images/sunglasses/party-glasses/thumbnail.webp"
+      },
+      {
+        "name": "Sunglasses",
+        "description": "The Sunglasses offer a classic and simple design with a focus on functionality. These sunglasses provide essential UV protection while maintaining a timeless look.",
+        "price": "22.99",
+        "stock": 27,
+        "image_url": "https://cdn.dummyjson.com/product-images/sunglasses/sunglasses/thumbnail.webp"
+      }
+    ]
+  }
+]

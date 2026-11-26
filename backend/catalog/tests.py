@@ -330,3 +330,60 @@ class ProductApiTests(CatalogTestCase):
         response = self.client.get(reverse("product-detail", args=[9999]))
 
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+    # ---- images ----------------------------------------------------------
+
+    def test_product_without_a_picture_reports_null(self):
+        """So the frontend can fall back to its placeholder tile."""
+        response = self.client.get(
+            reverse("product-detail", args=[self.cheap_phone.id])
+        )
+
+        self.assertIsNone(response.data["image"])
+
+    def test_external_image_url_is_returned_as_the_image(self):
+        self.cheap_phone.image_url = "https://cdn.example.com/phone.webp"
+        self.cheap_phone.save()
+
+        response = self.client.get(
+            reverse("product-detail", args=[self.cheap_phone.id])
+        )
+
+        self.assertEqual(response.data["image"], "https://cdn.example.com/phone.webp")
+
+    def test_image_url_can_be_set_through_the_api(self):
+        self.authenticate()
+
+        response = self.client.patch(
+            reverse("product-detail", args=[self.cheap_phone.id]),
+            {"image_url": "https://cdn.example.com/new.webp"},
+            format="json",
+        )
+
+        self.cheap_phone.refresh_from_db()
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(self.cheap_phone.image_url, "https://cdn.example.com/new.webp")
+
+    def test_uploaded_file_wins_over_the_external_url(self):
+        """A real upload should replace a seeded link, not sit behind it."""
+        self.cheap_phone.image_url = "https://cdn.example.com/seeded.webp"
+        self.cheap_phone.image = "products/uploaded.jpg"
+        self.cheap_phone.save()
+
+        response = self.client.get(
+            reverse("product-detail", args=[self.cheap_phone.id])
+        )
+
+        self.assertIn("products/uploaded.jpg", response.data["image"])
+        self.assertNotIn("cdn.example.com", response.data["image"])
+
+    def test_upload_url_is_absolute(self):
+        """The frontend is on another origin, so /media/... would not resolve."""
+        self.cheap_phone.image = "products/uploaded.jpg"
+        self.cheap_phone.save()
+
+        response = self.client.get(
+            reverse("product-detail", args=[self.cheap_phone.id])
+        )
+
+        self.assertTrue(response.data["image"].startswith("http"))

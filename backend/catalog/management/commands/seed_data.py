@@ -1,14 +1,25 @@
-"""Fill the database with sample categories and products for development.
+"""Fill the database with a sample catalog for development and demos.
 
     python manage.py seed_data
-    python manage.py seed_data --flush   # delete existing catalog data first
-    python manage.py seed_data --demo-user
+    python manage.py seed_data --flush        # delete existing data first
+    python manage.py seed_data --demo-user    # also create the demo account
+
+The catalog itself lives in `catalog_data.json` next to this file: 6
+categories and 49 products with real names, descriptions, prices and
+photographs. Keeping the data out of the code means it can be reviewed,
+edited or regenerated without touching the command.
 
 Safe to run repeatedly: products are matched by name inside their category,
 so a second run updates them instead of creating duplicates.
+
+Product pictures are referenced by URL rather than uploaded, because hosts
+such as Render wipe the filesystem on every deploy, which would leave the
+catalog imageless after the first redeploy.
 """
 
+import json
 from decimal import Decimal
+from pathlib import Path
 
 from django.contrib.auth import get_user_model
 from django.core.management.base import BaseCommand
@@ -19,55 +30,14 @@ from orders.models import Order
 
 User = get_user_model()
 
-# (category name, category description, [products])
-# Each product: (name, description, price, stock)
-SAMPLE_DATA = [
-    (
-        "Phones",
-        "Smartphones from budget to flagship.",
-        [
-            ("Pixel Lite 5G", "Compact Android phone with a clean interface.", "299.00", 25),
-            ("Galaxy S Ultra", "Flagship phone with a 200MP camera.", "1199.00", 8),
-            ("iPhone Air", "Lightweight iPhone with an A18 chip.", "999.00", 12),
-            ("Budget Phone X", "Entry level phone with a big battery.", "149.50", 60),
-            ("Nord Edge", "Mid-range phone with fast charging.", "449.00", 0),
-        ],
-    ),
-    (
-        "Laptops",
-        "Notebooks for work, study and gaming.",
-        [
-            ("UltraBook 14", "Thin and light laptop, 16GB RAM.", "1099.00", 10),
-            ("Gaming Beast 17", "RTX graphics and a 165Hz display.", "1899.99", 4),
-            ("Student Chromebook", "Affordable laptop for coursework.", "279.00", 30),
-        ],
-    ),
-    (
-        "Audio",
-        "Headphones, earbuds and speakers.",
-        [
-            ("NoiseCancel Pro", "Over-ear headphones with ANC.", "349.00", 18),
-            ("Daily Earbuds", "Wireless earbuds with a charging case.", "79.99", 75),
-            ("Party Speaker 40W", "Portable Bluetooth speaker.", "129.00", 22),
-        ],
-    ),
-    (
-        "Accessories",
-        "Cables, chargers and cases.",
-        [
-            ("65W GaN Charger", "Two-port fast charger.", "39.99", 100),
-            ("Braided USB-C Cable", "2 metre, 100W rated.", "12.50", 250),
-            ("Leather Phone Case", "Slim case with card slots.", "24.00", 40),
-        ],
-    ),
-]
+DATA_FILE = Path(__file__).resolve().parent / "catalog_data.json"
 
 DEMO_USERNAME = "demo"
 DEMO_PASSWORD = "demo12345"
 
 
 class Command(BaseCommand):
-    help = "Create sample categories and products for local development."
+    help = "Create the sample catalog of categories and products."
 
     def add_arguments(self, parser):
         parser.add_argument(
@@ -85,46 +55,46 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         if options["flush"]:
             # Orders go first: products are PROTECTed while an order uses them.
-            deleted_orders, _ = Order.objects.all().delete()
+            Order.objects.all().delete()
             Product.objects.all().delete()
             Category.objects.all().delete()
             self.stdout.write(self.style.WARNING("Existing catalog data deleted."))
 
-        created_products = updated_products = 0
+        categories = json.loads(DATA_FILE.read_text(encoding="utf-8"))
 
-        for name, description, products in SAMPLE_DATA:
+        created = updated = 0
+
+        for entry in categories:
             category, _ = Category.objects.update_or_create(
-                name=name,
-                defaults={"description": description},
+                name=entry["name"],
+                defaults={"description": entry["description"]},
             )
-            for product_name, product_description, price, stock in products:
-                _, created = Product.objects.update_or_create(
-                    name=product_name,
+            for product in entry["products"]:
+                _, was_created = Product.objects.update_or_create(
+                    name=product["name"],
                     category=category,
                     defaults={
-                        "description": product_description,
-                        "price": Decimal(price),
-                        "stock": stock,
+                        "description": product["description"],
+                        "price": Decimal(product["price"]),
+                        "stock": product["stock"],
+                        "image_url": product.get("image_url", ""),
                     },
                 )
-                if created:
-                    created_products += 1
-                else:
-                    updated_products += 1
+                created += was_created
+                updated += not was_created
 
         self.stdout.write(
             self.style.SUCCESS(
                 f"{Category.objects.count()} categories, "
-                f"{created_products} products created, "
-                f"{updated_products} updated."
+                f"{created} products created, {updated} updated."
             )
         )
 
         if options["demo_user"]:
-            user, created = User.objects.get_or_create(username=DEMO_USERNAME)
+            user, was_created = User.objects.get_or_create(username=DEMO_USERNAME)
             user.set_password(DEMO_PASSWORD)
             user.save()
-            action = "created" if created else "password reset"
+            action = "created" if was_created else "password reset"
             self.stdout.write(
                 self.style.SUCCESS(
                     f"Demo user {action}: {DEMO_USERNAME} / {DEMO_PASSWORD}"

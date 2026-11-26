@@ -17,11 +17,15 @@ export default function ProductDetailPage() {
   const [error, setError] = useState(null);
   const [quantity, setQuantity] = useState(1);
   const [added, setAdded] = useState(false);
+  const [imageFailed, setImageFailed] = useState(false);
 
   useEffect(() => {
     const controller = new AbortController();
     setLoading(true);
     setError(null);
+    setImageFailed(false);
+    setQuantity(1);
+    setAdded(false);
 
     productApi
       .get(id, { signal: controller.signal })
@@ -31,27 +35,44 @@ export default function ProductDetailPage() {
       })
       .catch((err) => {
         if (err.name === 'AbortError') return;
-        setError(
-          err.status === 404 ? 'This product does not exist.' : err.message,
-        );
+        setError(err.status === 404 ? 'This product does not exist.' : err.message);
         setLoading(false);
       });
 
     return () => controller.abort();
   }, [id]);
 
-  if (loading) return <p className="status">Loading product…</p>;
+  if (loading) {
+    return (
+      <div className="product-detail">
+        <div className="product-detail__grid">
+          <div className="skeleton product-detail__media" />
+          <div>
+            <div className="skeleton skeleton--line skeleton--short" />
+            <div className="skeleton skeleton--line skeleton--title" />
+            <div className="skeleton skeleton--line skeleton--medium" />
+            <div className="skeleton skeleton--line" />
+            <div className="skeleton skeleton--line" />
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (error) {
     return (
-      <div>
-        <p className="alert alert--error">{error}</p>
-        <Link to="/">← Back to products</Link>
+      <div className="empty-state card">
+        <h3>{error}</h3>
+        <Link to="/" className="button">
+          Back to products
+        </Link>
       </div>
     );
   }
 
   const soldOut = !product.in_stock;
+  const lowStock = product.in_stock && product.stock <= 5;
+  const showImage = product.image && !imageFailed;
 
   const handleAdd = () => {
     addItem(product, quantity);
@@ -60,14 +81,22 @@ export default function ProductDetailPage() {
 
   return (
     <article className="product-detail">
-      <Link to="/" className="product-detail__back">
-        ← Back to products
-      </Link>
+      <nav className="breadcrumbs" aria-label="Breadcrumb">
+        <Link to="/">Products</Link>
+        <span aria-hidden="true">/</span>
+        <Link to={`/?category=${product.category?.id}`}>{product.category?.name}</Link>
+        <span aria-hidden="true">/</span>
+        <span className="muted">{product.name}</span>
+      </nav>
 
       <div className="product-detail__grid">
-        <div className="product-detail__image">
-          {product.image ? (
-            <img src={product.image} alt="" />
+        <div className="product-detail__media">
+          {showImage ? (
+            <img
+              src={product.image}
+              alt={product.name}
+              onError={() => setImageFailed(true)}
+            />
           ) : (
             <span className="product-card__placeholder" aria-hidden="true">
               {product.name.charAt(0)}
@@ -75,13 +104,20 @@ export default function ProductDetailPage() {
           )}
         </div>
 
-        <div>
-          <p className="muted">{product.category?.name}</p>
+        <div className="product-detail__info">
+          <p className="product-card__category">{product.category?.name}</p>
           <h1>{product.name}</h1>
+
           <p className="product-detail__price">{formatPrice(product.price)}</p>
 
-          <p className={soldOut ? 'product-card__stock is-out' : 'product-card__stock'}>
-            {soldOut ? 'Out of stock' : `${product.stock} in stock`}
+          <p className="product-detail__stock">
+            {soldOut ? (
+              <span className="tag tag--muted">Out of stock</span>
+            ) : lowStock ? (
+              <span className="tag tag--warn">Only {product.stock} left</span>
+            ) : (
+              <span className="tag tag--ok">In stock · {product.stock} available</span>
+            )}
           </p>
 
           <p className="product-detail__description">
@@ -90,10 +126,20 @@ export default function ProductDetailPage() {
 
           {!soldOut && (
             <div className="product-detail__buy">
-              <div className="field">
-                <label htmlFor="quantity">Quantity</label>
+              <div className="quantity">
+                <button
+                  type="button"
+                  className="quantity__step"
+                  onClick={() => {
+                    setQuantity((q) => Math.max(1, q - 1));
+                    setAdded(false);
+                  }}
+                  disabled={quantity <= 1}
+                  aria-label="Decrease quantity"
+                >
+                  −
+                </button>
                 <input
-                  id="quantity"
                   type="number"
                   min="1"
                   // Capped at the stock the API reported. The server checks
@@ -101,14 +147,30 @@ export default function ProductDetailPage() {
                   // not the actual guard.
                   max={product.stock}
                   value={quantity}
+                  aria-label="Quantity"
                   onChange={(event) => {
                     const value = Number(event.target.value);
                     setQuantity(
-                      Math.max(1, Math.min(Number.isNaN(value) ? 1 : value, product.stock)),
+                      Math.max(
+                        1,
+                        Math.min(Number.isNaN(value) ? 1 : value, product.stock),
+                      ),
                     );
                     setAdded(false);
                   }}
                 />
+                <button
+                  type="button"
+                  className="quantity__step"
+                  onClick={() => {
+                    setQuantity((q) => Math.min(product.stock, q + 1));
+                    setAdded(false);
+                  }}
+                  disabled={quantity >= product.stock}
+                  aria-label="Increase quantity"
+                >
+                  +
+                </button>
               </div>
 
               <button type="button" className="button" onClick={handleAdd}>
@@ -127,6 +189,13 @@ export default function ProductDetailPage() {
             </div>
           )}
 
+          {!soldOut && (
+            <p className="product-detail__subtotal muted">
+              Subtotal:{' '}
+              <strong>{formatPrice(Number(product.price) * quantity)}</strong>
+            </p>
+          )}
+
           {added && (
             <p className="alert alert--success">
               Added to your cart. <Link to="/cart">Go to cart →</Link>
@@ -136,7 +205,11 @@ export default function ProductDetailPage() {
           <dl className="product-detail__meta">
             <div>
               <dt>Product id</dt>
-              <dd>{product.id}</dd>
+              <dd>#{product.id}</dd>
+            </div>
+            <div>
+              <dt>Category</dt>
+              <dd>{product.category?.name}</dd>
             </div>
             <div>
               <dt>Added</dt>

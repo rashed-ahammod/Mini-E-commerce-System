@@ -1,6 +1,7 @@
 """Admin registration for the catalog models."""
 
 from django.contrib import admin
+from django.utils.html import format_html
 
 from .models import Category, Product
 
@@ -18,9 +19,22 @@ class CategoryAdmin(admin.ModelAdmin):
 
 @admin.register(Product)
 class ProductAdmin(admin.ModelAdmin):
-    list_display = ("name", "category", "price", "stock", "created_at")
+    list_display = ("thumbnail", "name", "category", "price", "stock", "created_at")
+    list_display_links = ("thumbnail", "name")
     list_filter = ("category", "created_at")
     list_editable = ("price", "stock")
     search_fields = ("name", "description")
     autocomplete_fields = ("category",)
     date_hierarchy = "created_at"
+
+    @admin.display(description="")
+    def thumbnail(self, product: Product):
+        """Small preview so the list is scannable, from whichever image is set."""
+        url = product.image.url if product.image else product.image_url
+        if not url:
+            return "—"
+        return format_html(
+            '<img src="{}" alt="" style="height:38px;width:38px;'
+            'object-fit:cover;border-radius:6px;" />',
+            url,
+        )

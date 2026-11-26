@@ -97,6 +97,16 @@ export default function CartPage() {
       <ul className="cart__list">
         {items.map((item) => (
           <li key={item.id} className="cart__item card">
+            <Link to={`/products/${item.id}`} className="cart__item-media">
+              {item.image ? (
+                <img src={item.image} alt="" loading="lazy" />
+              ) : (
+                <span className="product-card__placeholder" aria-hidden="true">
+                  {item.name.charAt(0)}
+                </span>
+              )}
+            </Link>
+
             <div className="cart__item-main">
               <Link to={`/products/${item.id}`} className="cart__item-name">
                 {item.name}

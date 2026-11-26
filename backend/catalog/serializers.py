@@ -34,12 +34,31 @@ class CategoryBriefSerializer(serializers.ModelSerializer):
         fields = ["id", "name"]
 
 
+def resolve_image(product, request=None):
+    """The picture to show for a product, or None.
+
+    An uploaded file wins over `image_url`, so a product can be given a
+    proper photo later without clearing the seeded link. Upload URLs are
+    made absolute, because the frontend runs on a different origin and a
+    path like /media/... would resolve against the frontend instead.
+    """
+    if product.image:
+        url = product.image.url
+        return request.build_absolute_uri(url) if request else url
+    return product.image_url or None
+
+
 class ProductBriefSerializer(serializers.ModelSerializer):
     """Compact product, nested inside order responses."""
+
+    image = serializers.SerializerMethodField()
 
     class Meta:
         model = Product
         fields = ["id", "name", "price", "image"]
+
+    def get_image(self, product):
+        return resolve_image(product, self.context.get("request"))
 
 
 class ProductSerializer(serializers.ModelSerializer):
@@ -60,6 +79,14 @@ class ProductSerializer(serializers.ModelSerializer):
     )
     in_stock = serializers.BooleanField(read_only=True)
 
+    # Read: one resolved URL, whichever source the product uses.
+    image = serializers.SerializerMethodField()
+    # Write: upload a file...
+    image_upload = serializers.ImageField(
+        source="image", write_only=True, required=False, allow_null=True
+    )
+    # ...or point at one hosted elsewhere.
+
     class Meta:
         model = Product
         fields = [
@@ -72,10 +99,15 @@ class ProductSerializer(serializers.ModelSerializer):
             "category",
             "category_id",
             "image",
+            "image_upload",
+            "image_url",
             "created_at",
             "updated_at",
         ]
         read_only_fields = ["id", "created_at", "updated_at"]
+
+    def get_image(self, product):
+        return resolve_image(product, self.context.get("request"))
 
     def validate_price(self, value):
         if value < 0:

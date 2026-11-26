@@ -39,7 +39,18 @@ class Product(models.Model):
         on_delete=models.CASCADE,
         related_name="products",
     )
+    # Two ways to give a product a picture:
+    #   `image`     an uploaded file, served from MEDIA_ROOT
+    #   `image_url` a link to a picture hosted elsewhere
+    # Uploads are the obvious choice locally, but hosts like Render wipe the
+    # filesystem on every deploy, so the seeded catalog uses URLs. The
+    # serializer resolves whichever is set into a single `image` field.
     image = models.ImageField(upload_to="products/", blank=True, null=True)
+    image_url = models.URLField(
+        max_length=500,
+        blank=True,
+        help_text="Link to an externally hosted picture, used when no file is uploaded.",
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

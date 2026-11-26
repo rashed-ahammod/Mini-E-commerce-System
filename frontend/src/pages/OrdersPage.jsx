@@ -71,7 +71,16 @@ export default function OrdersPage() {
             {orders.map((order) => (
               <tr key={order.id}>
                 <td>#{order.id}</td>
-                <td>{order.product.name}</td>
+                <td>
+                  <div className="table__product">
+                    {order.product.image && (
+                      <img src={order.product.image} alt="" loading="lazy" />
+                    )}
+                    <Link to={`/products/${order.product.id}`}>
+                      {order.product.name}
+                    </Link>
+                  </div>
+                </td>
                 <td>{order.quantity}</td>
                 <td>{formatPrice(order.total_price)}</td>
                 <td className="muted">{formatDate(order.created_at)}</td>

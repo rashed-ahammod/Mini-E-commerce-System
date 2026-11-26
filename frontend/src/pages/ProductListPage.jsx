@@ -1,27 +1,30 @@
 /**
- * The catalog: search, category filter, price range, ordering and pagination.
+ * The catalog: a filter sidebar on the left, the product grid on the right.
  *
- * All of that work is done by the API, not in the browser — this page only
- * collects the inputs, puts them in the URL query string, and renders what
- * comes back. Keeping the filters in the URL means a filtered view can be
- * bookmarked, shared, and survives the back button.
+ * Searching, filtering, sorting and paging are all done by the API — this
+ * page only collects the inputs, writes them to the URL query string, and
+ * renders what comes back. Keeping the filters in the URL means a filtered
+ * view can be bookmarked, shared, and survives the back button.
  */
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 
+import CatalogSidebar from '../components/CatalogSidebar';
 import Pagination from '../components/Pagination';
 import ProductCard from '../components/ProductCard';
+import ProductCardSkeleton from '../components/ProductCardSkeleton';
 import { categoryApi, productApi } from '../api/endpoints';
 import { useDebouncedValue } from '../hooks/useDebouncedValue';
 
-const PAGE_SIZE = 8;
+const PAGE_SIZE = 9;
 
 const ORDERING_OPTIONS = [
   { value: '-created_at', label: 'Newest first' },
   { value: 'price', label: 'Price: low to high' },
   { value: '-price', label: 'Price: high to low' },
   { value: 'name', label: 'Name: A to Z' },
+  { value: '-stock', label: 'Best stocked' },
 ];
 
 export default function ProductListPage() {
@@ -41,8 +44,8 @@ export default function ProductListPage() {
     [searchParams],
   );
 
-  // The search box is the one control that is not applied instantly, so it
-  // keeps its own state and is pushed to the URL once typing pauses.
+  // The search box is the one control not applied instantly: it keeps its own
+  // state and is pushed to the URL once typing pauses.
   const [searchInput, setSearchInput] = useState(filters.search);
   const debouncedSearch = useDebouncedValue(searchInput);
 
@@ -81,8 +84,8 @@ export default function ProductListPage() {
     }
   }, [debouncedSearch, filters.search, updateFilters]);
 
-  // Categories for the filter dropdown. page_size=100 so the dropdown is not
-  // silently truncated by pagination.
+  // Categories for the sidebar. page_size=100 so the list is not silently
+  // truncated by pagination.
   useEffect(() => {
     categoryApi
       .list({ page_size: 100, ordering: 'name' })
@@ -129,156 +132,119 @@ export default function ProductListPage() {
     return () => controller.abort();
   }, [filters, updateFilters]);
 
-  const clearFilters = () => {
+  const clearFilters = useCallback(() => {
     setSearchInput('');
     setSearchParams({}, { replace: true });
-  };
+  }, [setSearchParams]);
 
-  const hasFilters =
-    filters.search ||
-    filters.category ||
-    filters.minPrice ||
-    filters.maxPrice ||
-    filters.inStock;
+  // Ordering is not counted: it is always set to something.
+  const activeFilters = [
+    filters.search,
+    filters.category,
+    filters.minPrice,
+    filters.maxPrice,
+    filters.inStock,
+  ].filter(Boolean).length;
+
+  const activeCategory = categories.find(
+    (category) => String(category.id) === String(filters.category),
+  );
 
   return (
     <div className="catalog">
-      <header className="catalog__header">
-        <h1>Products</h1>
-        <p className="muted">
-          Browse the catalog. Searching, filtering, sorting and paging are all
-          done by the API.
-        </p>
+      <header className="catalog__hero">
+        <div>
+          <h1>
+            {activeCategory ? activeCategory.name : 'All products'}
+          </h1>
+          <p className="muted">
+            {activeCategory
+              ? activeCategory.description || 'Browse this category.'
+              : 'Phones, laptops, tablets and accessories.'}
+          </p>
+        </div>
       </header>
 
-      <form className="filters card" onSubmit={(event) => event.preventDefault()}>
-        <div className="filters__row">
-          <div className="field filters__search">
-            <label htmlFor="search">Search</label>
-            <input
-              id="search"
-              type="search"
-              placeholder="e.g. phone"
-              value={searchInput}
-              onChange={(event) => setSearchInput(event.target.value)}
-            />
+      <div className="catalog__layout">
+        <CatalogSidebar
+          categories={categories}
+          filters={filters}
+          searchInput={searchInput}
+          onSearchChange={setSearchInput}
+          onChange={updateFilters}
+          onClear={clearFilters}
+          activeCount={activeFilters}
+          resultCount={count}
+        />
+
+        <div className="catalog__main">
+          <div className="catalog__toolbar">
+            <p className="catalog__count">
+              {loading ? (
+                'Loading…'
+              ) : (
+                <>
+                  <strong>{count}</strong> product{count === 1 ? '' : 's'}
+                  {activeFilters > 0 && ' matching your filters'}
+                </>
+              )}
+            </p>
+
+            <div className="catalog__sort">
+              <label htmlFor="ordering">Sort by</label>
+              <select
+                id="ordering"
+                value={filters.ordering}
+                onChange={(event) => updateFilters({ ordering: event.target.value })}
+              >
+                {ORDERING_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
 
-          <div className="field">
-            <label htmlFor="category">Category</label>
-            <select
-              id="category"
-              value={filters.category}
-              onChange={(event) => updateFilters({ category: event.target.value })}
-            >
-              <option value="">All categories</option>
-              {categories.map((category) => (
-                <option key={category.id} value={category.id}>
-                  {category.name} ({category.product_count})
-                </option>
+          {error && <p className="alert alert--error">{error}</p>}
+
+          {loading ? (
+            <div className="product-grid">
+              {Array.from({ length: PAGE_SIZE }, (_, index) => (
+                <ProductCardSkeleton key={index} />
               ))}
-            </select>
-          </div>
-
-          <div className="field">
-            <label htmlFor="ordering">Sort by</label>
-            <select
-              id="ordering"
-              value={filters.ordering}
-              onChange={(event) => updateFilters({ ordering: event.target.value })}
-            >
-              {ORDERING_OPTIONS.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
+            </div>
+          ) : products.length === 0 ? (
+            <div className="empty-state card">
+              <h3>No products match these filters</h3>
+              <p className="muted">
+                Try a different search term, or widen the price range.
+              </p>
+              {activeFilters > 0 && (
+                <button type="button" className="button" onClick={clearFilters}>
+                  Clear all filters
+                </button>
+              )}
+            </div>
+          ) : (
+            <div className="product-grid">
+              {products.map((product) => (
+                <ProductCard key={product.id} product={product} />
               ))}
-            </select>
-          </div>
-        </div>
-
-        <div className="filters__row">
-          <div className="field">
-            <label htmlFor="min_price">Min price</label>
-            <input
-              id="min_price"
-              type="number"
-              min="0"
-              step="0.01"
-              placeholder="0"
-              value={filters.minPrice}
-              onChange={(event) => updateFilters({ min_price: event.target.value })}
-            />
-          </div>
-
-          <div className="field">
-            <label htmlFor="max_price">Max price</label>
-            <input
-              id="max_price"
-              type="number"
-              min="0"
-              step="0.01"
-              placeholder="Any"
-              value={filters.maxPrice}
-              onChange={(event) => updateFilters({ max_price: event.target.value })}
-            />
-          </div>
-
-          <label className="checkbox">
-            <input
-              type="checkbox"
-              checked={filters.inStock}
-              onChange={(event) => updateFilters({ in_stock: event.target.checked })}
-            />
-            In stock only
-          </label>
-
-          {hasFilters && (
-            <button
-              type="button"
-              className="button button--ghost button--small"
-              onClick={clearFilters}
-            >
-              Clear filters
-            </button>
+            </div>
           )}
+
+          <Pagination
+            page={filters.page}
+            count={count}
+            pageSize={PAGE_SIZE}
+            onChange={(page) => {
+              updateFilters({ page });
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
+          />
         </div>
-      </form>
-
-      {error && <p className="alert alert--error">{error}</p>}
-
-      {loading ? (
-        <p className="status">Loading products…</p>
-      ) : products.length === 0 ? (
-        <p className="status">
-          No products match these filters.{' '}
-          {hasFilters && (
-            <button type="button" className="link-button" onClick={clearFilters}>
-              Clear them
-            </button>
-          )}
-        </p>
-      ) : (
-        <>
-          <p className="catalog__count muted">
-            {count} product{count === 1 ? '' : 's'} found
-          </p>
-          <div className="product-grid">
-            {products.map((product) => (
-              <ProductCard key={product.id} product={product} />
-            ))}
-          </div>
-        </>
-      )}
-
-      <Pagination
-        page={filters.page}
-        count={count}
-        pageSize={PAGE_SIZE}
-        onChange={(page) => {
-          updateFilters({ page });
-          window.scrollTo({ top: 0, behavior: 'smooth' });
-        }}
-      />
+      </div>
     </div>
   );
 }
