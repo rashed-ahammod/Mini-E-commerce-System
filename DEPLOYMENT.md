@@ -14,45 +14,104 @@ Deploy the **backend first** — the frontend needs its URL at build time.
 
 ---
 
-## 1. Choose where the database lives
+## 1. Database: Neon
 
-SQLite cannot be used in production here: Render's filesystem is ephemeral,
-so the file would be wiped on every deploy and on every restart. It has to be
-PostgreSQL. Two realistic options:
+SQLite cannot be used in production here. Render's filesystem is ephemeral,
+so the file would be wiped on every deploy and every restart. The database
+has to be PostgreSQL, and this project uses **[Neon](https://neon.com)**.
 
-| | **Render Postgres (Free)** | **Neon / Supabase (Free)** |
-| --- | --- | --- |
-| Setup | Created automatically by `render.yaml` | Sign up, copy a connection string |
-| Lifetime | **Expires 30 days after creation**, then a 14-day grace period before the data is deleted | No expiry |
-| Storage | 1 GB, one free database per workspace | ~0.5 GB (Neon free) |
-| Latency to Render | Same platform, very low | Slightly higher, pick the nearest region |
-| Best for | Trying it out, short-lived demos | **Anything that must keep working**, e.g. a submitted assignment or a portfolio link |
+**Why Neon rather than Render's own free Postgres:** a free Render Postgres
+**expires 30 days after it is created**, then gives a 14-day grace period
+before the data is deleted. Nothing warns you; a working deployment simply
+stops working about a month later. Neon's free tier has no expiry date, which
+matters if a reviewer might open your link weeks after you submit it.
 
-**Recommendation:** if a reviewer might open this more than a month from now,
-use **Neon**. The 30-day expiry is the one thing most likely to make a
-working deployment appear broken later, and it is invisible until it
-happens.
+Nothing in the application code depends on this choice — `config/settings.py`
+reads `DATABASE_URL` and does not care who provides it. Switching back to
+Render Postgres later is a change to `render.yaml` only (the bottom of that
+file explains how).
 
-Either way the application code is identical — `config/settings.py` reads
-`DATABASE_URL` and does not care who provides it.
+### Create the database
 
-### Using Neon (or another external Postgres)
+1. Sign up at <https://neon.com> (GitHub login works) and create a project.
+2. **Pick the region closest to your Render region** — every query crosses
+   that distance. If your Render service is in Oregon, choose a US West
+   region; for Frankfurt choose EU Central.
+3. Name the database something like `mini_ecommerce`.
+4. On the project dashboard, open **Connect** and copy the connection
+   string. It looks like:
 
-1. Create a project at <https://neon.com>, copy the connection string
-   (`postgres://user:password@ep-xxx.region.aws.neon.tech/dbname?sslmode=require`).
-2. In `render.yaml`, delete the whole `databases:` block at the bottom and
-   change the `DATABASE_URL` entry to:
-
-   ```yaml
-   - key: DATABASE_URL
-     sync: false
+   ```
+   postgresql://neondb_owner:npg_XXXX@ep-cool-bird-a1b2c3d4.us-east-2.aws.neon.tech/neondb?sslmode=require
    ```
 
-3. Paste the connection string into Render when it asks for that value.
-4. Set `DJANGO_DB_CONN_MAX_AGE=0`, because Neon suspends an idle database and
-   a connection held open across requests can go stale.
+### Pooled or direct?
 
----
+Neon offers two forms of that string. The **direct** one is the default; the
+**pooled** one has `-pooler` in the hostname.
+
+| | Direct (recommended here) | Pooled (`-pooler`) |
+| --- | --- | --- |
+| Use when | A handful of connections — which is this app: Render Free runs 2 gunicorn workers | Many short-lived connections |
+| Extra setting | none | `DJANGO_DB_DISABLE_SERVER_SIDE_CURSORS=True` |
+
+The pooler runs in **transaction mode**, handing each transaction a
+different backend connection, so anything relying on session state — a
+server-side cursor in particular — breaks. Django has a setting for exactly
+this, wired to `DJANGO_DB_DISABLE_SERVER_SIDE_CURSORS` in
+`config/settings.py`. Two workers do not need pooling, so take the direct
+string and skip the complication.
+
+`manage.py db_info` warns you if it sees a `-pooler` host without that flag
+set.
+
+### Test it locally before deploying
+
+This is worth doing first: it proves the connection string works and that
+the schema builds on PostgreSQL, before Render is involved.
+
+```bash
+cd backend
+
+# .env is gitignored, so the credentials stay out of the repository
+echo 'DATABASE_URL=postgresql://...your Neon string...' >> .env
+echo 'DJANGO_DB_CONN_MAX_AGE=0' >> .env
+
+python manage.py db_info      # which database am I actually on?
+python manage.py migrate      # build the schema on Neon
+python manage.py seed_data --demo-user
+python manage.py createsuperuser
+python manage.py runserver
+```
+
+`db_info` prints the engine, host, TLS mode and server version, and times the
+connection — so a typo in the string or a wrong region shows up immediately
+rather than as a failed deploy.
+
+Run the test suite against it too, to be sure nothing in the project depends
+on SQLite behaviour:
+
+```bash
+python manage.py test
+```
+
+The test runner creates and drops a separate `test_neondb` database, so your
+real data is untouched.
+
+When you are done testing locally, **remove `DATABASE_URL` from
+`backend/.env`** so development goes back to the local SQLite file and you
+are not writing to the production database by accident.
+
+### Keep in mind
+
+- **Neon suspends an idle database** and resumes it on the next connection.
+  That is why `DJANGO_DB_CONN_MAX_AGE` is `0` in `render.yaml`: a connection
+  held open across requests can be dead by the time it is reused. Connecting
+  per request costs a few milliseconds.
+- **`?sslmode=require` is part of the connection string** — keep it. The app
+  also has `DJANGO_DB_SSL_REQUIRE` for providers whose string omits it.
+- **The free tier has a storage limit** (around 0.5 GB), which this project
+  will not come close to.
 
 ## 2. Backend on Render
 
@@ -60,11 +119,13 @@ Either way the application code is identical — `config/settings.py` reads
 
 1. Push this repository to GitHub.
 2. Render dashboard → **New → Blueprint** → select the repository.
-3. Render reads `render.yaml` and creates the web service (and the database,
-   unless you removed that block). It will prompt for the values marked
-   `sync: false`.
-4. Set `CORS_ALLOWED_ORIGINS` after step 3 of the frontend, once the Vercel
-   URL exists. Leave it empty for the first deploy.
+3. Render reads `render.yaml` and creates the web service. It prompts for
+   the values marked `sync: false` — paste the **Neon connection string**
+   into `DATABASE_URL` there.
+4. Leave `CORS_ALLOWED_ORIGINS` empty for now and fill it in after the
+   frontend's first deploy (section 3), once the Vercel URL exists.
+5. Set `SEED_DATA` to `true` for this first deploy if you want the sample
+   catalog, then back to `false` afterwards.
 
 ### Option B — by hand
 
@@ -84,12 +145,13 @@ Render dashboard → **New → Web Service**, then:
 | --- | --- |
 | `DJANGO_SECRET_KEY` | a generated secret — **required**, the app refuses to boot without it |
 | `DJANGO_DEBUG` | `False` |
-| `DATABASE_URL` | from Render Postgres, or your Neon/Supabase string |
+| `DATABASE_URL` | the Neon connection string, including `?sslmode=require` |
 | `CORS_ALLOWED_ORIGINS` | the Vercel URL, e.g. `https://mini-ecommerce.vercel.app` |
 | `PYTHON_VERSION` | `3.13.5` |
 | `SEED_DATA` | `true` for the first deploy, then `false` |
 | `DJANGO_SUPERUSER_USERNAME` / `_EMAIL` / `_PASSWORD` | optional, creates an admin during the build |
-| `DJANGO_DB_CONN_MAX_AGE` | `0` if using Neon or another database that suspends when idle |
+| `DJANGO_DB_CONN_MAX_AGE` | `0` — Neon suspends when idle, so connections are not reused across requests |
+| `DJANGO_DB_DISABLE_SERVER_SIDE_CURSORS` | `True` only if `DATABASE_URL` is a pooled (`-pooler`) string |
 | `CORS_ALLOWED_ORIGIN_REGEXES` | optional, for Vercel preview URLs (see below) |
 
 `DJANGO_ALLOWED_HOSTS` and `DJANGO_CSRF_TRUSTED_ORIGINS` do **not** need the
@@ -111,6 +173,10 @@ curl "https://<your-service>.onrender.com/api/products/?search=phone&ordering=pr
 ```
 
 The admin is at `https://<your-service>.onrender.com/admin/`.
+
+If the catalog comes back empty, the seed did not run: check that `SEED_DATA`
+was `true` during the build, and look at the build log for the
+"Loading sample catalog data..." line.
 
 ---
 
@@ -163,7 +229,9 @@ browser.
   no images, so this only matters if you upload some. Fixing it properly
   means object storage (Cloudinary, S3) — out of scope here, but worth
   knowing before you demo an upload.
-- **A free Render Postgres expires after 30 days.** See section 1.
+- **Neon suspends an idle database.** The first query after a quiet period
+  pays a small resume cost. This is separate from, and much shorter than,
+  Render's own cold start.
 - **Vercel previews need the CORS regex**, as above.
 
 ---

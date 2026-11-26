@@ -182,18 +182,23 @@ short version:
 Deploy the backend first — the frontend needs its URL, which Vite inlines at
 build time.
 
-### The database
+### The database: Neon
 
-SQLite cannot be used in production: Render's filesystem is ephemeral, so the
-file is wiped on every deploy. Use PostgreSQL via `DATABASE_URL` — the code
-is identical either way.
+SQLite cannot be used in production — Render's filesystem is ephemeral, so
+the file is wiped on every deploy. This project uses
+**[Neon](https://neon.com)** (managed PostgreSQL, free tier) via
+`DATABASE_URL`.
 
-- **Render Postgres (Free)** is created automatically by `render.yaml`, but
-  **expires 30 days after creation** (then a 14-day grace period before the
-  data is deleted).
-- **Neon or Supabase (Free)** have no expiry, and are the better choice if a
-  reviewer might open the link more than a month from now. Set
-  `DJANGO_DB_CONN_MAX_AGE=0` for those, since they suspend when idle.
+Render's own free Postgres **expires 30 days after creation**, with no
+warning and a 14-day grace period before the data is deleted; Neon's free
+tier has no expiry. That matters if a reviewer opens the link weeks after
+submission. Nothing in the code depends on the choice, so switching back is
+a `render.yaml` edit (documented at the bottom of that file).
+
+Use Neon's **direct** connection string (not the `-pooler` one) and set
+`DJANGO_DB_CONN_MAX_AGE=0`, since Neon suspends an idle database.
+`python manage.py db_info` reports which database you are actually connected
+to, how long it took, and whether TLS is on.
 
 ### Production behaviour
 

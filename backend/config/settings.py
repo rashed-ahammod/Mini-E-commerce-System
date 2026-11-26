@@ -136,8 +136,8 @@ DATABASES = {
         os.getenv("DATABASE_URL", f"sqlite:///{BASE_DIR / 'db.sqlite3'}"),
         # Reuse connections instead of opening one per request. Set
         # DJANGO_DB_CONN_MAX_AGE=0 for a serverless Postgres that suspends
-        # when idle (Neon, Supabase pooler), where a kept-open connection can
-        # go stale between requests.
+        # when idle (Neon, Supabase), where a connection held open between
+        # requests can go stale.
         conn_max_age=int(os.getenv("DJANGO_DB_CONN_MAX_AGE", "600")),
         # Check a reused connection is still usable before handing it to a
         # view, so a dropped connection becomes a retry rather than a 500.
@@ -145,6 +145,15 @@ DATABASES = {
         ssl_require=env_bool("DJANGO_DB_SSL_REQUIRE", False),
     )
 }
+
+# Required when connecting through a pooler that runs in transaction mode -
+# Neon's "-pooler" host, Supabase's port 6543, PgBouncer generally. Those
+# hand each transaction a different backend connection, so the session-level
+# state a server-side cursor depends on is not there, and reads fail.
+# Leave this off when using a direct connection: without server-side cursors,
+# QuerySet.iterator() loads the whole result set into memory.
+if env_bool("DJANGO_DB_DISABLE_SERVER_SIDE_CURSORS", False):
+    DATABASES["default"]["DISABLE_SERVER_SIDE_CURSORS"] = True
 
 
 # --------------------------------------------------------------------------

@@ -47,6 +47,18 @@ python manage.py runserver
 their category, so a second run updates them instead of creating duplicates.
 Add `--flush` to wipe the catalog (and orders) first.
 
+## Management commands
+
+| Command | What it does |
+| --- | --- |
+| `python manage.py seed_data` | Load the sample catalog. `--flush` clears first, `--demo-user` adds a `demo` account |
+| `python manage.py db_info` | Report which database is actually in use: engine, host, TLS mode, server version, connection time and table count |
+
+`db_info` is the quickest way to tell whether you are on the local SQLite
+file or a hosted PostgreSQL, and it warns if a pooled connection string is
+used without `DJANGO_DB_DISABLE_SERVER_SIDE_CURSORS`. See
+[../DEPLOYMENT.md](../DEPLOYMENT.md) for the database setup.
+
 ## Authentication
 
 Token authentication. Log in once, then send the token on every protected
