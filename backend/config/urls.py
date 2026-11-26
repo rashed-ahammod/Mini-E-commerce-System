@@ -14,6 +14,7 @@ from django.urls import include, path
 
 urlpatterns = [
     path("admin/", admin.site.urls),
+    path("api/", include("catalog.urls")),
     # Login/logout pages for DRF's browsable API (handy while developing).
     path("api-auth/", include("rest_framework.urls")),
 ]
