@@ -156,6 +156,27 @@ A successful order reduces the product's stock by the ordered quantity.
 | 405 | Method not allowed (e.g. editing an order) |
 | 409 | Delete refused because existing orders reference the object |
 
+## Automated tests
+
+```bash
+python manage.py test              # whole suite
+python manage.py test orders       # one app
+python manage.py test orders.tests.CreateOrderTests.test_successful_order_reduces_stock
+```
+
+60 tests run against a throwaway database, so they never touch `db.sqlite3`.
+
+| File | Covers |
+| --- | --- |
+| `accounts/tests.py` | registration (hashing, weak and duplicate usernames), login, the identical message for wrong password vs unknown user, `me`, token invalidation on logout |
+| `catalog/tests.py` | category and product CRUD, read-public / write-authenticated, every filter, search, ordering and pagination parameter, and the 409 on deleting something an order references |
+| `orders/tests.py` | server-calculated prices, stock decrement, every stock-validation path, the price snapshot, order isolation between users, and 405 on editing an order |
+
+The ones worth reading first are the behaviours that are easy to get wrong:
+`test_client_cannot_choose_its_own_price`, `test_a_rejected_order_leaves_stock_untouched`,
+`test_stock_cannot_be_oversold_by_repeated_orders` and
+`test_another_users_order_returns_404_not_403`.
+
 ## Testing with Postman
 
 [`postman/`](../postman) in the repository root holds a collection and an
