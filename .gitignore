@@ -11,8 +11,10 @@ db.sqlite3-journal
 /backend/staticfiles/
 
 # ---- Environment ----
+# Covers .env, .env.local, .env.backup-*, anything.env - then re-includes
+# the committed template. Secrets must never reach the repository.
 .env
-.env.local
+.env.*
 *.env
 !.env.example
 

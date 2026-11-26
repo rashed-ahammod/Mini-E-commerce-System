@@ -85,5 +85,5 @@ class Command(BaseCommand):
         self.stdout.write(f"  tables present : {applied}")
         if applied == 0:
             self.stdout.write(
-                self.style.WARNING("  No tables yet — run `python manage.py migrate`.")
+                self.style.WARNING("  No tables yet - run `python manage.py migrate`.")
             )

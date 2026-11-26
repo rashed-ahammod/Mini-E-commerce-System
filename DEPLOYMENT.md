@@ -35,8 +35,14 @@ file explains how).
 
 1. Sign up at <https://neon.com> (GitHub login works) and create a project.
 2. **Pick the region closest to your Render region** — every query crosses
-   that distance. If your Render service is in Oregon, choose a US West
-   region; for Frankfurt choose EU Central.
+   that distance, and it dominates everything else. Measured from a laptop in
+   Asia against a `us-west-2` Neon database: ~250 ms per query and ~2.5 s to
+   open a connection. From a Render service in the *same* region those drop
+   to single-digit milliseconds. Oregon ↔ `us-west-2`, Frankfurt ↔ EU Central.
+
+   This is also why running the app locally against Neon feels slow: it is
+   the distance, not the database. Keep `DATABASE_URL` commented out in
+   `backend/.env` for day-to-day development and use SQLite.
 3. Name the database something like `mini_ecommerce`.
 4. On the project dashboard, open **Connect** and copy the connection
    string. It looks like:
