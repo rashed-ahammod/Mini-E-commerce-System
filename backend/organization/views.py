@@ -8,18 +8,47 @@ other says "log in first".
 from rest_framework import mixins, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
+from rest_framework.views import APIView
 
 from accounts.permissions import IsOrganizationUser
 from orders.models import InvalidTransition, Order, OrderStatus
 
+from .dashboard import build_dashboard
 from .filters import OrgOrderFilter
 from .serializers import (
+    DashboardQuerySerializer,
     OrderCancelSerializer,
     OrderStatusUpdateSerializer,
     OrgOrderDetailSerializer,
     OrgOrderListSerializer,
     TransitionRulesSerializer,
 )
+
+
+class DashboardView(APIView):
+    """GET /api/org/dashboard/ — the state of the shop in one request.
+
+        ?days=7                  narrow the trend window (1-365, default 30)
+        ?low_stock_threshold=10  what counts as running low (default 5)
+
+    Everything is aggregated by the database, so the cost does not grow with
+    the number of orders. See organization/dashboard.py for what each figure
+    means — in particular, "booked" and "realised" revenue answer different
+    questions and cancelled orders are excluded from both.
+    """
+
+    permission_classes = [IsOrganizationUser]
+
+    def get(self, request):
+        query = DashboardQuerySerializer(data=request.query_params)
+        query.is_valid(raise_exception=True)
+
+        return Response(
+            build_dashboard(
+                days=query.validated_data["days"],
+                low_stock_threshold=query.validated_data["low_stock_threshold"],
+            )
+        )
 
 
 class OrgOrderViewSet(

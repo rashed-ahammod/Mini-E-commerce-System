@@ -144,3 +144,20 @@ class TransitionRulesSerializer(serializers.Serializer):
             }
             for status in OrderStatus
         ]
+
+
+class DashboardQuerySerializer(serializers.Serializer):
+    """Query parameters for GET /api/org/dashboard/.
+
+    Both are bounded: an unbounded `days` would let a caller ask for a
+    multi-year daily series in one request.
+    """
+
+    days = serializers.IntegerField(
+        required=False, default=30, min_value=1, max_value=365,
+        help_text="Window for the trend and the 'in_window' figures.",
+    )
+    low_stock_threshold = serializers.IntegerField(
+        required=False, default=5, min_value=0, max_value=1000,
+        help_text="Stock at or below this counts as running low.",
+    )
