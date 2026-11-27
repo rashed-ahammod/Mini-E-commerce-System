@@ -41,7 +41,16 @@ class Profile(models.Model):
         default=Role.CUSTOMER,
         help_text="What this account is allowed to do in the API.",
     )
+    # Contact details. Blank at the database level because a Profile is
+    # created by a signal the moment a User exists — before anyone has had
+    # the chance to type anything. What makes them *required* is the
+    # serializer that owns them (accounts.serializers.MyProfileSerializer),
+    # plus `is_complete` below, which the UI uses to ask for what is missing.
     phone = models.CharField(max_length=30, blank=True)
+    address = models.TextField(
+        blank=True,
+        help_text="Where this person's orders are delivered by default.",
+    )
     # Free text so a shop can record which desk or branch someone works at.
     department = models.CharField(
         max_length=100,
@@ -73,6 +82,30 @@ class Profile(models.Model):
     @property
     def is_customer(self) -> bool:
         return not self.is_organization
+
+    # -- completeness -----------------------------------------------------
+
+    @property
+    def missing_details(self) -> list[str]:
+        """Which of the required contact details are still empty.
+
+        An order has to reach a real person at a real address, so email,
+        phone and address are all required of a customer before checkout.
+        Returning the field names — rather than a bare boolean — lets the
+        shop say exactly what it still needs.
+        """
+        missing = []
+        if not (self.user.email or "").strip():
+            missing.append("email")
+        if not self.phone.strip():
+            missing.append("phone")
+        if not self.address.strip():
+            missing.append("address")
+        return missing
+
+    @property
+    def is_complete(self) -> bool:
+        return not self.missing_details
 
 
 def profile_for(user):

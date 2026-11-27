@@ -6,8 +6,13 @@ import { useAuth } from '../auth/useAuth';
 import { useCart } from '../cart/useCart';
 
 export default function NavBar() {
-  const { user, isAuthenticated, logout } = useAuth();
+  const { user, isAuthenticated, logout, profileComplete } = useAuth();
   const { itemCount } = useCart();
+
+  // A customer whose profile is short of a phone number or an address cannot
+  // check out. Flagging it on the avatar means they find out while browsing
+  // rather than at the last step of a purchase.
+  const needsDetails = isAuthenticated && !user?.is_organization && !profileComplete;
 
   return (
     <header className="navbar">
@@ -37,7 +42,28 @@ export default function NavBar() {
         <div className="navbar__account">
           {isAuthenticated ? (
             <>
-              <span className="navbar__user">{user.username}</span>
+              <NavLink
+                to="/profile"
+                className="navbar__identity"
+                title={
+                  needsDetails
+                    ? 'Your profile needs a phone number and address'
+                    : 'Your profile'
+                }
+              >
+                <span className="navbar__avatar" aria-hidden="true">
+                  {user.username.charAt(0).toUpperCase()}
+                </span>
+                <span className="navbar__user">{user.username}</span>
+                {needsDetails && (
+                  <span className="navbar__dot" aria-hidden="true" />
+                )}
+                {needsDetails && (
+                  <span className="visually-hidden">
+                    — details needed before you can order
+                  </span>
+                )}
+              </NavLink>
               <button type="button" className="button button--ghost" onClick={logout}>
                 Log out
               </button>

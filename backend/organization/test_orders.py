@@ -8,6 +8,8 @@ cannot reach any of it.
 from decimal import Decimal
 
 from django.contrib.auth import get_user_model
+from django.db import connection
+from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 from rest_framework import status
 from rest_framework.authtoken.models import Token
@@ -404,3 +406,106 @@ class CustomerVisibilityTests(OrgOrderTestCase):
         self.cara_order.refresh_from_db()
         self.assertEqual(response.status_code, status.HTTP_405_METHOD_NOT_ALLOWED)
         self.assertEqual(self.cara_order.status, OrderStatus.PENDING)
+
+
+class OrgSeesDeliveryDetailsTests(OrgOrderTestCase):
+    """Staff have to know where an order goes, and how to reach the customer.
+
+    The order's address is a snapshot taken when it was placed; the profile
+    holds the customer's current one. Both are shown, because they answer
+    different questions — "where was this sent" and "how do I reach them
+    today" — and they can legitimately differ.
+    """
+
+    DELIVERED_TO = "House 12, Road 5, Dhanmondi, Dhaka 1205"
+    MOVED_TO = "Plot 7, Sector 11, Uttara, Dhaka 1230"
+
+    def setUp(self):
+        super().setUp()
+        self.cara_order.delivery_address = self.DELIVERED_TO
+        self.cara_order.delivery_phone = "+880 1711 123456"
+        self.cara_order.save()
+
+        self.client.credentials(HTTP_AUTHORIZATION=f"Token {self.staff_token.key}")
+
+    def test_the_order_list_carries_the_destination(self):
+        """So a picking list does not need a request per row."""
+        response = self.client.get(reverse("org-order-list"))
+
+        rows = {row["id"]: row for row in response.data["results"]}
+        self.assertEqual(
+            rows[self.cara_order.id]["delivery_address"], self.DELIVERED_TO
+        )
+        self.assertEqual(
+            rows[self.cara_order.id]["delivery_phone"], "+880 1711 123456"
+        )
+
+    def test_the_order_detail_carries_the_destination(self):
+        response = self.client.get(
+            reverse("org-order-detail", args=[self.cara_order.id])
+        )
+
+        self.assertEqual(response.data["delivery_address"], self.DELIVERED_TO)
+
+    def test_the_customers_current_contact_details_come_too(self):
+        profile = profile_for(self.cara)
+        profile.phone = "+880 1999 888777"
+        profile.address = self.MOVED_TO
+        profile.save()
+
+        response = self.client.get(
+            reverse("org-order-detail", args=[self.cara_order.id])
+        )
+
+        # Where it went, and where they live now — both, and distinctly.
+        self.assertEqual(response.data["delivery_address"], self.DELIVERED_TO)
+        self.assertEqual(response.data["customer"]["address"], self.MOVED_TO)
+        self.assertEqual(response.data["customer"]["phone"], "+880 1999 888777")
+
+    def test_a_customer_still_cannot_read_any_of_it(self):
+        """Delivery addresses are the last thing that should leak."""
+        self.client.credentials(HTTP_AUTHORIZATION=f"Token {self.cara_token.key}")
+
+        listed = self.client.get(reverse("org-order-list"))
+        detail = self.client.get(
+            reverse("org-order-detail", args=[self.dan_order.id])
+        )
+
+        self.assertEqual(listed.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(detail.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_the_list_does_not_cost_a_query_per_customer(self):
+        """The customer's profile is joined, not fetched row by row.
+
+        This asserts the query count is *the same* for a short page and a
+        longer one, rather than pinning an exact number: the exact figure is
+        an implementation detail a new prefetch could legitimately change,
+        while "it does not grow with the number of orders" is the property
+        worth defending. Without select_related("user__profile") in the
+        viewset, reading each customer's phone costs a query per row and
+        these two figures diverge.
+        """
+
+        def query_count(expected_rows):
+            with CaptureQueriesContext(connection) as captured:
+                response = self.client.get(
+                    reverse("org-order-list"), {"page_size": 50}
+                )
+                self.assertEqual(response.status_code, status.HTTP_200_OK)
+                self.assertEqual(len(response.data["results"]), expected_rows)
+            return len(captured)
+
+        short_page = query_count(2)
+
+        for index in range(8):
+            buyer = User.objects.create_user(f"buyer{index}", password=PASSWORD)
+            self.place(buyer, self.product, 1)
+
+        long_page = query_count(10)
+
+        self.assertEqual(
+            short_page,
+            long_page,
+            f"{short_page} queries for 2 orders but {long_page} for 10: "
+            "something is being fetched once per row.",
+        )

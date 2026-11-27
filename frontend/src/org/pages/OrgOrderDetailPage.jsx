@@ -201,6 +201,38 @@ export default function OrgOrderDetailPage() {
 
           <section className="panel">
             <header className="panel__header">
+              <h2>Deliver to</h2>
+            </header>
+            <address className="delivery-card">
+              <span className="delivery-card__name">
+                {order.customer.username}
+              </span>
+              {/* The address as it was when the order was placed, not the
+                  customer's current one — this is what a courier was given. */}
+              <span className="delivery-card__address">
+                {order.delivery_address || 'No address recorded on this order.'}
+              </span>
+              {order.delivery_phone && (
+                <a
+                  className="delivery-card__phone"
+                  href={`tel:${order.delivery_phone.replace(/[^+0-9]/g, '')}`}
+                >
+                  {order.delivery_phone}
+                </a>
+              )}
+            </address>
+            {order.customer.address &&
+              order.customer.address !== order.delivery_address && (
+                <p className="panel__note muted">
+                  The customer&rsquo;s profile address now reads{' '}
+                  <q>{order.customer.address}</q>. This order was placed to the
+                  address above.
+                </p>
+              )}
+          </section>
+
+          <section className="panel">
+            <header className="panel__header">
               <h2>History</h2>
             </header>
             <ol className="timeline">
@@ -249,6 +281,10 @@ export default function OrgOrderDetailPage() {
               <div>
                 <dt>Email</dt>
                 <dd>{order.customer.email || '—'}</dd>
+              </div>
+              <div>
+                <dt>Phone</dt>
+                <dd>{order.customer.phone || '—'}</dd>
               </div>
               <div>
                 <dt>Customer since</dt>

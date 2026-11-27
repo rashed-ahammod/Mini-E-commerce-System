@@ -183,6 +183,34 @@ export default function OrgCustomerDetailPage() {
 
       <section className="panel">
         <header className="panel__header">
+          <h2>Contact details</h2>
+          {!customer.profile_complete && (
+            <span className="pill pill--warn">Incomplete</span>
+          )}
+        </header>
+        <dl className="facts">
+          <div>
+            <dt>Email</dt>
+            <dd>{customer.email || '—'}</dd>
+          </div>
+          <div>
+            <dt>Phone</dt>
+            <dd>{customer.phone || '—'}</dd>
+          </div>
+          <div>
+            <dt>Default delivery address</dt>
+            <dd className="facts__address">{customer.address || '—'}</dd>
+          </div>
+        </dl>
+        <p className="panel__note muted">
+          {customer.profile_complete
+            ? 'Their default address. Each order carries the address it was placed to, which may differ.'
+            : 'This customer cannot check out until they fill in the missing details. Only they can change them.'}
+        </p>
+      </section>
+
+      <section className="panel">
+        <header className="panel__header">
           <h2>Recent orders</h2>
           <Link to={`/org/orders?customer_username=${customer.username}`}>
             See all →

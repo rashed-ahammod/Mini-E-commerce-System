@@ -161,6 +161,9 @@ class RoleInAuthResponsesTests(APITestCase):
             reverse("register"),
             {
                 "username": "sneaky",
+                "email": "sneaky@example.com",
+                "phone": "+880 1711 123456",
+                "address": "House 12, Road 5, Dhanmondi, Dhaka 1205",
                 "password": PASSWORD,
                 "role": Role.ADMIN,
                 "is_organization": True,

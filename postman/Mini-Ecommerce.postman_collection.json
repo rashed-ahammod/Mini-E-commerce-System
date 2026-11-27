@@ -71,9 +71,9 @@
             },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"username\": \"testuser\",\n  \"email\": \"testuser@example.com\",\n  \"password\": \"StrongPass!234\"\n}"
+              "raw": "{\n  \"username\": \"testuser\",\n  \"email\": \"testuser@example.com\",\n  \"phone\": \"+880 1711 123456\",\n  \"address\": \"House 12, Road 5, Dhanmondi, Dhaka 1205\",\n  \"password\": \"StrongPass!234\"\n}"
             },
-            "description": "Create an account. Responds 201 with {token, user}. Passwords run through Django's validators, so a short or common password returns 400 listing exactly what is wrong. Running this a second time returns 400 (username taken) - use Login after that."
+            "description": "Create an account. Responds 201 with {token, user}. Email, phone and address are all required: an order has to reach a real person at a real address, and collecting them here means checkout is prefilled from the first purchase. Leaving one out returns 400 naming that field. Passwords run through Django's validators, so a short or common password returns 400 listing exactly what is wrong. Running this a second time returns 400 (username taken) - use Login after that."
           }
         },
         {
@@ -188,6 +188,120 @@
               ]
             },
             "description": "Returns the user the token belongs to. 401 without a valid token. The frontend calls this on startup to check a stored token is still good."
+          }
+        },
+        {
+          "name": "My profile",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Token {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/auth/profile/",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "auth",
+                "profile",
+                ""
+              ]
+            },
+            "description": "The caller's own details as one flat object - email lives on User and phone/address on Profile, which this hides. profile_complete and missing_details say whether the account can check out, so a client can prompt for what is missing rather than failing at checkout. There is no id in the URL: the token decides whose profile this is."
+          }
+        },
+        {
+          "name": "Update my profile",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('the address was stored', () =>",
+                  "  pm.expect(pm.response.json().address).to.include('Gulshan'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Token {{token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/auth/profile/",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "auth",
+                "profile",
+                ""
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"phone\": \"+880 1999 888777\",\n  \"address\": \"Flat 4B, 90 Gulshan Avenue, Gulshan, Dhaka 1212\"\n}"
+            },
+            "description": "Partial update: send only what changed. A field that IS sent still has to be valid, so PATCHing {\"phone\": \"\"} returns 400 - a requirement a later request could quietly undo would be no requirement at all. `role` is reported by this endpoint but never accepted, so it is not a route to privileges."
+          }
+        },
+        {
+          "name": "Update my profile - blanking a required field (400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 400', () => pm.response.to.have.status(400));",
+                  "pm.test('the error names the field', () =>",
+                  "  pm.expect(pm.response.json()).to.have.property('phone'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Token {{token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/auth/profile/",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "auth",
+                "profile",
+                ""
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"phone\": \"\"\n}"
+            },
+            "description": "A required detail cannot be emptied once it is set. The error is keyed to the field, so a form can show it against the input."
           }
         }
       ]
@@ -799,9 +913,97 @@
             },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"product_id\": {{product_id}},\n  \"quantity\": 2\n}"
+              "raw": "{\n  \"product_id\": {{product_id}},\n  \"quantity\": 2,\n  \"delivery_address\": \"House 12, Road 5, Dhanmondi, Dhaka 1205\",\n  \"delivery_phone\": \"+880 1711 123456\"\n}"
             },
-            "description": "Only product_id and quantity are sent. The user comes from the token, and unit_price and total_price are calculated on the server - sending them has no effect. The product's stock is reduced by the quantity."
+            "description": "product_id, quantity and where to deliver. The user comes from the token, and unit_price and total_price are calculated on the server - sending them has no effect. delivery_phone is optional: without it the profile's number is used, so a number is always recorded. The address is snapshotted onto the order, so moving house later does not rewrite where this parcel went. The product's stock is reduced by the quantity."
+          }
+        },
+        {
+          "name": "Create order - to my profile address",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 201', () => pm.response.to.have.status(201));",
+                  "pm.test('the saved address was used', () =>",
+                  "  pm.expect(pm.response.json().delivery_address).to.not.be.empty);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Token {{token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/orders/",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "orders",
+                ""
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"product_id\": {{product_id}},\n  \"quantity\": 1,\n  \"use_profile_address\": true\n}"
+            },
+            "description": "The \"deliver to my saved address\" route. The server reads the address off the profile itself rather than trusting a value that travelled through the browser, and it wins over a delivery_address sent alongside it. Add \"save_to_profile\": true to a typed address instead, to store it as the new default. If the profile has no address, this returns 400 against use_profile_address saying what to do about it."
+          }
+        },
+        {
+          "name": "Create order - no delivery address (400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 400', () => pm.response.to.have.status(400));",
+                  "pm.test('the error is keyed to the address', () =>",
+                  "  pm.expect(pm.response.json()).to.have.property('delivery_address'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Token {{token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/orders/",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "orders",
+                ""
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"product_id\": {{product_id}},\n  \"quantity\": 1,\n  \"delivery_address\": \"home\"\n}"
+            },
+            "description": "An order that cannot be delivered is not an order. \"home\" is refused for the same reason an empty address is, and the error arrives against delivery_address rather than as a non_field_errors, so a form can point at the input. Nothing is half-done: no order, and the stock stays on the shelf."
           }
         },
         {
@@ -830,9 +1032,9 @@
             },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"product_id\": {{product_id}},\n  \"quantity\": 99999\n}"
+              "raw": "{\n  \"product_id\": {{product_id}},\n  \"quantity\": 99999,\n  \"delivery_address\": \"House 12, Road 5, Dhanmondi, Dhaka 1205\"\n}"
             },
-            "description": "Expected: 400 with a message naming how many units are available. Stock is left untouched."
+            "description": "Expected: 400 with a message naming how many units are available. Stock is left untouched. The address is valid so that this fails on the stock, which is what it is here to show."
           }
         },
         {
@@ -857,7 +1059,7 @@
             },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"product_id\": {{product_id}},\n  \"quantity\": 1\n}"
+              "raw": "{\n  \"product_id\": {{product_id}},\n  \"quantity\": 1,\n  \"delivery_address\": \"House 12, Road 5, Dhanmondi, Dhaka 1205\"\n}"
             },
             "description": "Deliberately sends no Authorization header. Expected: 401."
           }

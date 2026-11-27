@@ -11,7 +11,12 @@ from rest_framework.authtoken.models import Token
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from .serializers import LoginSerializer, RegisterSerializer, UserSerializer
+from .serializers import (
+    LoginSerializer,
+    MyProfileSerializer,
+    RegisterSerializer,
+    UserSerializer,
+)
 
 
 def token_response(user, status_code=status.HTTP_200_OK):
@@ -76,6 +81,27 @@ class MeView(generics.RetrieveAPIView):
     """
 
     serializer_class = UserSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_object(self):
+        return self.request.user
+
+
+class MyProfileView(generics.RetrieveUpdateAPIView):
+    """GET/PATCH/PUT /api/auth/profile/ -> the caller's own details.
+
+    Separate from `/auth/me/`, which is the read-only "who am I" check the
+    frontend makes on startup. This one writes, and it writes only to the
+    account the token belongs to — there is no id in the URL, so there is no
+    way to aim it at someone else. Changing another person's details is an
+    organization job, under /api/org/.
+
+    PATCH is the normal case (send only what changed). A field that is sent
+    still has to be valid, so this cannot be used to blank out a phone
+    number or an address that checkout depends on.
+    """
+
+    serializer_class = MyProfileSerializer
     permission_classes = [permissions.IsAuthenticated]
 
     def get_object(self):

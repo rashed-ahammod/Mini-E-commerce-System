@@ -94,10 +94,29 @@ everything under `/api/orders/`, requires a token.
 
 | Method | Path | Auth | Description |
 | --- | --- | --- | --- |
-| POST | `/register/` | — | Create an account. Returns `{token, user}` (201) so the client is logged in straight away. |
+| POST | `/register/` | — | Create an account: `{username, email, phone, address, password}`. Returns `{token, user}` (201) so the client is logged in straight away. |
 | POST | `/login/` | — | `{username, password}` → `{token, user}`. |
 | POST | `/logout/` | token | Deletes the token (204). The old token then returns 401. |
 | GET | `/me/` | token | The user the token belongs to. |
+| GET | `/profile/` | token | The caller's own details, flat: `username`, `first_name`, `last_name`, `email`, `phone`, `address`, `role`, `profile_complete`, `missing_details`. |
+| PATCH / PUT | `/profile/` | token | Change them. Partial, but a field that *is* sent must be valid — a required detail cannot be blanked. |
+
+#### Required details
+
+`email`, `phone` and `address` are required of every account: an order has to
+reach a real person at a real address. Registration collects all three, so a
+new customer can check out without being stopped half-way to ask.
+
+They live on two tables — `email` on `User`, the rest on `Profile` — which
+`/profile/` hides behind one flat object. `profile_complete` and
+`missing_details` travel with every login, `/me/` and `/profile/` response,
+so a client can prompt for what is missing instead of discovering it when an
+order fails.
+
+`/profile/` takes **no id**. The token decides whose profile it is, so the
+endpoint cannot be aimed at another account, and `role` is reported but never
+accepted — it is not a route to privileges. Changing someone else's details
+is an organization job, under `/api/org/`.
 
 ### Categories — `/api/categories/`
 
@@ -235,15 +254,47 @@ All endpoints require a token, and only ever touch the caller's own orders.
 
 | Method | Path | Description |
 | --- | --- | --- |
-| POST | `/` | Place an order: `{"product_id": 1, "quantity": 2}` |
+| POST | `/` | Place an order: `{"product_id": 1, "quantity": 2, "delivery_address": "…"}` |
 | GET | `/` | The caller's orders, newest first, paginated |
 | GET | `/{id}/` | One of the caller's orders |
 
-The request body carries only `product_id` and `quantity`. The user comes from
-the token and `unit_price` / `total_price` are calculated on the server, so a
-client cannot choose what it pays or order on someone else's behalf. Orders
-cannot be edited or deleted through the API (405) — an order is a record of
-something that happened.
+The request body carries `product_id`, `quantity` and where to deliver. The
+user comes from the token and `unit_price` / `total_price` are calculated on
+the server, so a client cannot choose what it pays or order on someone else's
+behalf. Orders cannot be edited or deleted through the API (405) — an order
+is a record of something that happened.
+
+#### Where an order goes
+
+A delivery address is required, and it can arrive either of two ways:
+
+| Field | Meaning |
+| --- | --- |
+| `delivery_address` | Typed in for this order. |
+| `use_profile_address` | Deliver to the address saved on the caller's profile. The server reads it off the profile, rather than trusting a value that travelled through the browser, and it wins over a `delivery_address` sent alongside it. |
+| `delivery_phone` | Number for this delivery. Falls back to the profile's, so a number is always recorded; sending one overrides it, which is how "call me on this instead" works. |
+| `save_to_profile` | Also store the typed address on the profile as the new default. |
+
+Both are validated the same way the profile validates them, so an order
+cannot be stored with a destination too vague to deliver to. A refused
+address is reported against the field, not as a `non_field_errors`, and
+nothing is half-done — no order, and the stock stays on the shelf:
+
+```json
+{ "delivery_address": ["Enter a full delivery address — street, area and city."] }
+```
+
+Asking for a profile address that is not there says so, and says what to do
+about it, rather than failing obscurely:
+
+```json
+{ "use_profile_address": ["Your profile does not have a delivery address yet. Add one on your profile, or type an address instead."] }
+```
+
+The address is then **snapshotted onto the order**, exactly as `unit_price`
+is. A customer moving house must not rewrite the address a courier already
+delivered to, so the organization console shows both: `delivery_address` on
+the order, and the customer's current `address` beside it.
 
 Ordering more than the available stock returns 400 and leaves stock untouched:
 

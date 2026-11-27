@@ -34,7 +34,7 @@ class OrderAdmin(admin.ModelAdmin):
         "created_at",
     )
     list_filter = ("status", "created_at")
-    search_fields = ("user__username", "product__name")
+    search_fields = ("user__username", "product__name", "delivery_address")
     autocomplete_fields = ("user", "product")
     # Prices are derived from the product and quantity; status moves through
     # the API so the stock and history stay consistent with it.

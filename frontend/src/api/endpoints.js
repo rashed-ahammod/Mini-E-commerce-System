@@ -10,9 +10,19 @@ import { api } from './client';
 // ---- auth -----------------------------------------------------------------
 
 export const authApi = {
-  /** POST /auth/register/ -> { token, user } */
-  register: ({ username, email, password }) =>
-    api.post('/auth/register/', { username, email, password }, { auth: false }),
+  /**
+   * POST /auth/register/ -> { token, user }
+   *
+   * Email, phone and address are required by the API: an order has to reach
+   * a real person at a real address, and collecting them here means checkout
+   * can be prefilled from the profile the very first time.
+   */
+  register: ({ username, email, phone, address, password }) =>
+    api.post(
+      '/auth/register/',
+      { username, email, phone, address, password },
+      { auth: false },
+    ),
 
   /** POST /auth/login/ -> { token, user } */
   login: ({ username, password }) =>
@@ -23,6 +33,18 @@ export const authApi = {
 
   /** GET /auth/me/ -> the user the stored token belongs to */
   me: () => api.get('/auth/me/'),
+
+  /**
+   * The caller's own profile. There is no id in the URL — the token decides
+   * whose details these are — so this can never be aimed at someone else.
+   */
+  profile: {
+    /** GET /auth/profile/ */
+    get: (options) => api.get('/auth/profile/', options),
+
+    /** PATCH /auth/profile/ — send only what changed. */
+    update: (changes) => api.patch('/auth/profile/', changes),
+  },
 };
 
 // ---- catalog --------------------------------------------------------------
@@ -49,9 +71,30 @@ export const productApi = {
 // ---- orders ---------------------------------------------------------------
 
 export const orderApi = {
-  /** POST /orders/ — the user comes from the token, prices from the server */
-  create: ({ productId, quantity }) =>
-    api.post('/orders/', { product_id: productId, quantity }),
+  /**
+   * POST /orders/ — the user comes from the token, prices from the server.
+   *
+   * Delivery is given one of two ways, and the server settles which wins:
+   * either `deliveryAddress` is typed in, or `useProfileAddress` asks for
+   * the address saved on the profile. `saveToProfile` additionally stores
+   * the typed address as the account's new default.
+   */
+  create: ({
+    productId,
+    quantity,
+    deliveryAddress,
+    deliveryPhone,
+    useProfileAddress = false,
+    saveToProfile = false,
+  }) =>
+    api.post('/orders/', {
+      product_id: productId,
+      quantity,
+      delivery_address: deliveryAddress,
+      delivery_phone: deliveryPhone,
+      use_profile_address: useProfileAddress,
+      save_to_profile: saveToProfile,
+    }),
 
   /** GET /orders/ -> the logged-in user's orders, newest first */
   list: (params) => api.get('/orders/', { params }),

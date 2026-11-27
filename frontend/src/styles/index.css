@@ -1077,31 +1077,98 @@ label {
   font-variant-numeric: tabular-nums;
 }
 
-.cart__footer {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
+/* Checkout is two columns on a wide screen: the basket and the delivery
+   form on the left, the summary on the right where it can stay in view.
+   One column below 900px, with the summary last — on a phone the natural
+   order is "check the basket, say where it goes, then pay". */
+
+.cart__layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 320px;
+  align-items: start;
   gap: var(--gap);
-  flex-wrap: wrap;
 }
 
-.cart__footer p {
+.cart__main {
+  min-width: 0;
+}
+
+.cart__summary {
+  position: sticky;
+  top: calc(var(--gap) + 56px);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.cart__summary h2 {
   margin: 0;
+  font-size: 1rem;
+}
+
+.cart__totals {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.cart__totals > div {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  font-size: 0.9rem;
+}
+
+.cart__totals dt {
+  color: var(--text-muted);
+}
+
+.cart__totals dd {
+  margin: 0;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.cart__grand-total {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+  font-size: 0.9rem;
+  color: var(--text-muted);
 }
 
 .cart__total {
-  font-size: 1.6rem;
+  font-size: 1.5rem;
   font-weight: 700;
   letter-spacing: -0.02em;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
 }
 
 .cart__note {
+  margin: 0;
   font-size: 0.78rem;
 }
 
 .cart__actions {
   display: flex;
-  gap: 10px;
+  flex-direction: column;
+  gap: 8px;
+}
+
+@media (max-width: 900px) {
+  .cart__layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .cart__summary {
+    position: static;
+  }
 }
 
 /* ===== tables (order history) =========================================== */
@@ -1327,4 +1394,346 @@ label {
   .table td:nth-child(5) {
     display: none;
   }
+}
+
+/* ===== form furniture =================================================== */
+/* Shared by the profile, registration and delivery forms, so a required
+   field and its hint look the same wherever they appear. */
+
+.field__required {
+  margin-left: 6px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 0.68rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  vertical-align: 1px;
+}
+
+.field__hint {
+  margin: 6px 0 0;
+  color: var(--text-subtle);
+  font-size: 0.8rem;
+}
+
+/* Two fields side by side, stacking when there is no room for both. */
+.field-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 0 var(--gap);
+}
+
+/* A read-only input still has to be comfortable to read — it is used for the
+   delivery address while the saved one is in use, which is exactly the value
+   a customer wants to check. */
+input[readonly],
+textarea[readonly] {
+  background: var(--surface-muted);
+  color: var(--text);
+  cursor: default;
+}
+
+/* ===== selectable options =============================================== */
+/* The checkbox-as-card used for "use my profile address" and "save this
+   address": a tap target big enough to carry the address it refers to. */
+
+.option {
+  display: flex;
+  align-items: flex-start;
+  gap: 11px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s, box-shadow 0.15s;
+}
+
+.option:hover {
+  border-color: var(--border-strong);
+}
+
+.option--on {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+
+.option--unavailable {
+  cursor: default;
+  opacity: 0.85;
+}
+
+.option--unavailable:hover {
+  border-color: var(--border);
+}
+
+.option input {
+  width: 17px;
+  height: 17px;
+  margin: 2px 0 0;
+  accent-color: var(--accent);
+  flex: none;
+  cursor: inherit;
+}
+
+.option__body {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.option__title {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.option__detail {
+  color: var(--text-muted);
+  font-size: 0.825rem;
+  /* Addresses are typed with line breaks in them; keep them. */
+  white-space: pre-line;
+}
+
+/* ===== delivery details (checkout) ====================================== */
+
+.delivery__header {
+  margin-bottom: var(--gap);
+}
+
+.delivery__header h2 {
+  margin: 0 0 2px;
+  font-size: 1.05rem;
+}
+
+.delivery__header p {
+  margin: 0;
+  font-size: 0.875rem;
+}
+
+.delivery__options {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: var(--gap);
+}
+
+/* The destination on an order, as the shop and its staff read it back. */
+.delivery-card {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent);
+  border-radius: var(--radius);
+  background: var(--surface-muted);
+  font-style: normal;
+}
+
+.delivery-card__name {
+  font-weight: 600;
+}
+
+.delivery-card__address {
+  color: var(--text-muted);
+  white-space: pre-line;
+}
+
+.delivery-card__phone {
+  margin-top: 4px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 500;
+}
+
+/* ===== the profile page ================================================= */
+
+.profile__header {
+  display: flex;
+  align-items: center;
+  gap: var(--gap);
+  margin-bottom: var(--gap);
+}
+
+.profile__avatar {
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  flex: none;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--accent), var(--accent-hover));
+  color: var(--accent-text);
+  font-size: 1.4rem;
+  font-weight: 700;
+}
+
+.profile__identity {
+  flex: 1;
+  min-width: 0;
+}
+
+.profile__identity h1 {
+  margin: 0 0 2px;
+  font-size: 1.4rem;
+}
+
+.profile__identity p {
+  margin: 0;
+  font-size: 0.875rem;
+}
+
+.profile__since {
+  font-size: 0.8rem;
+}
+
+.profile__grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 300px;
+  align-items: start;
+  gap: var(--gap);
+}
+
+.profile__form h2,
+.profile__aside h2 {
+  margin: 0 0 4px;
+  font-size: 1.05rem;
+}
+
+.profile__form-intro {
+  margin: 0 0 var(--gap);
+  font-size: 0.875rem;
+}
+
+.profile__actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding-top: 4px;
+  font-size: 0.85rem;
+}
+
+.profile__aside .facts {
+  margin-bottom: var(--gap);
+}
+
+.profile__aside-note {
+  margin: 0;
+  font-size: 0.8rem;
+}
+
+@media (max-width: 900px) {
+  .profile__grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .profile__header {
+    flex-wrap: wrap;
+  }
+}
+
+/* ===== the signed-in identity in the navbar ============================= */
+
+.navbar__identity {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 10px 4px 4px;
+  border-radius: 999px;
+  text-decoration: none;
+  transition: background 0.15s;
+}
+
+.navbar__identity:hover {
+  background: var(--surface-muted);
+  text-decoration: none;
+}
+
+.navbar__avatar {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+/* The "your profile is missing something" mark. Shape and position only —
+   the text alternative sits beside it, because a colour is not a message. */
+.navbar__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--warn);
+  box-shadow: 0 0 0 2px var(--surface);
+}
+
+/* ===== additions to shared pieces ======================================= */
+
+.alert--warn {
+  background: var(--warn-soft);
+  color: var(--warn);
+}
+
+.pill--warn {
+  background: var(--warn-soft);
+  color: var(--warn);
+}
+
+.pill--accent {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.button--block {
+  width: 100%;
+}
+
+.facts__address {
+  white-space: pre-line;
+}
+
+.order-detail__subhead {
+  margin: 0 0 var(--gap);
+  font-size: 1.05rem;
+}
+
+.order-detail__address {
+  white-space: pre-line;
+}
+
+/* Visible to a screen reader, not on screen. For text that explains an
+   icon or a coloured mark. */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* ===== focus ============================================================ */
+/* A visible ring for the things that did not have one: links, buttons and
+   the option cards. Text inputs are left alone — they already answer focus
+   with the accent halo set further up, and an outline on top of that reads
+   as two rings. :focus-visible, so a mouse click does not leave a ring
+   behind. */
+
+:where(a, button, .option, [tabindex]):focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
 }

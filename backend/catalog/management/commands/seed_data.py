@@ -25,6 +25,7 @@ from django.contrib.auth import get_user_model
 from django.core.management.base import BaseCommand
 from django.db import transaction
 
+from accounts.models import profile_for
 from catalog.models import Category, Product
 from orders.models import Order
 
@@ -34,6 +35,12 @@ DATA_FILE = Path(__file__).resolve().parent / "catalog_data.json"
 
 DEMO_USERNAME = "demo"
 DEMO_PASSWORD = "demo12345"
+# The demo account needs contact details like any other: email, phone and
+# address are required before an order can be placed, so without them the
+# "log in as demo and buy something" walkthrough would stop at checkout.
+DEMO_EMAIL = "demo@example.com"
+DEMO_PHONE = "+880 1711 123456"
+DEMO_ADDRESS = "House 12, Road 5\nDhanmondi, Dhaka 1205"
 
 
 class Command(BaseCommand):
@@ -91,9 +98,26 @@ class Command(BaseCommand):
         )
 
         if options["demo_user"]:
-            user, was_created = User.objects.get_or_create(username=DEMO_USERNAME)
+            user, was_created = User.objects.get_or_create(
+                username=DEMO_USERNAME,
+                defaults={"email": DEMO_EMAIL},
+            )
             user.set_password(DEMO_PASSWORD)
+            if not user.email:
+                user.email = DEMO_EMAIL
             user.save()
+
+            # A profile already exists — the post_save signal made it — so
+            # this fills it in. Only where it is empty: someone demonstrating
+            # the shop may well have changed the address, and re-running the
+            # seed should not undo that.
+            profile = profile_for(user)
+            if not profile.phone.strip():
+                profile.phone = DEMO_PHONE
+            if not profile.address.strip():
+                profile.address = DEMO_ADDRESS
+            profile.save()
+
             action = "created" if was_created else "password reset"
             self.stdout.write(
                 self.style.SUCCESS(

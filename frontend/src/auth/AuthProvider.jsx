@@ -63,6 +63,20 @@ export function AuthProvider({ children }) {
     return created;
   }, []);
 
+  /**
+   * Re-read the account from the server.
+   *
+   * The profile page calls this after saving, so the details the rest of the
+   * app reads off `user` — the address checkout prefills, and whether the
+   * profile is complete — are the ones that were just stored, rather than a
+   * copy that drifts the moment anything changes.
+   */
+  const refreshUser = useCallback(async () => {
+    const me = await authApi.me();
+    setUser(me);
+    return me;
+  }, []);
+
   const logout = useCallback(async () => {
     try {
       await authApi.logout();
@@ -75,8 +89,20 @@ export function AuthProvider({ children }) {
   }, []);
 
   const value = useMemo(
-    () => ({ user, loading, isAuthenticated: Boolean(user), login, register, logout }),
-    [user, loading, login, register, logout],
+    () => ({
+      user,
+      loading,
+      isAuthenticated: Boolean(user),
+      // Everything an order needs before it can be delivered. The shop uses
+      // this to prompt for what is missing instead of failing at checkout.
+      profileComplete: Boolean(user?.profile_complete),
+      missingDetails: user?.missing_details ?? [],
+      login,
+      register,
+      logout,
+      refreshUser,
+    }),
+    [user, loading, login, register, logout, refreshUser],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

@@ -85,7 +85,14 @@ class OrgOrderViewSet(
 
     permission_classes = [IsOrganizationUser]
     filterset_class = OrgOrderFilter
-    search_fields = ["product__name", "user__username", "user__email"]
+    # The delivery address too: "which orders are going to Uttara?" is a
+    # question staff genuinely ask when a courier run goes wrong.
+    search_fields = [
+        "product__name",
+        "user__username",
+        "user__email",
+        "delivery_address",
+    ]
     ordering_fields = ["created_at", "total_price", "status", "status_updated_at"]
     ordering = ["-created_at"]
 
@@ -93,7 +100,11 @@ class OrgOrderViewSet(
         # Unlike the customer's OrderViewSet this is NOT filtered by user:
         # seeing every order is the whole point of the organization view.
         return (
-            Order.objects.select_related("user", "product", "product__category")
+            # user__profile too: the serializer reads the customer's phone
+            # and address off it, which would otherwise be a query per row.
+            Order.objects.select_related(
+                "user", "user__profile", "product", "product__category"
+            )
             .prefetch_related("events", "events__changed_by")
             .all()
         )

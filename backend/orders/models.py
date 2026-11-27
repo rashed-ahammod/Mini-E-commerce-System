@@ -69,6 +69,19 @@ class Order(models.Model):
     unit_price = models.DecimalField(max_digits=10, decimal_places=2)
     total_price = models.DecimalField(max_digits=12, decimal_places=2)
 
+    # Where this order goes. Snapshotted onto the order, exactly like
+    # `unit_price`: a customer moving house next year must not silently
+    # rewrite the address a courier already delivered to. The profile holds
+    # the *default*; this holds what was agreed for this order.
+    delivery_address = models.TextField(
+        help_text="The address this order is delivered to.",
+    )
+    delivery_phone = models.CharField(
+        max_length=30,
+        blank=True,
+        help_text="Number to call about this delivery.",
+    )
+
     status = models.CharField(
         max_length=20,
         choices=OrderStatus.choices,

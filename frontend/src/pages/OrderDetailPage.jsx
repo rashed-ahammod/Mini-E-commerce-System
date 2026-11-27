@@ -84,6 +84,30 @@ export default function OrderDetailPage() {
           does not change if the product is repriced later.
         </p>
       </div>
+
+      <div className="card order-detail__card">
+        <h2 className="order-detail__subhead">Delivery</h2>
+        <dl className="order-detail__list">
+          <div>
+            <dt>Address</dt>
+            {/* Whitespace is preserved, so a typed-out address keeps the
+                lines the customer put it on. */}
+            <dd className="order-detail__address">
+              {order.delivery_address || '—'}
+            </dd>
+          </div>
+          <div>
+            <dt>Contact number</dt>
+            <dd>{order.delivery_phone || '—'}</dd>
+          </div>
+        </dl>
+
+        <p className="muted order-detail__note">
+          This is where the order was sent when it was placed. Changing your{' '}
+          <Link to="/profile">profile address</Link> affects future orders, not
+          this one.
+        </p>
+      </div>
     </div>
   );
 }

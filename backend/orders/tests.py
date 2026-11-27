@@ -19,14 +19,30 @@ from .models import Order
 User = get_user_model()
 
 
+# A destination the server will accept: specific enough to deliver to.
+ADDRESS = "House 12, Road 5, Dhanmondi, Dhaka 1205"
+PROFILE_ADDRESS = "Flat 4B, 90 Gulshan Avenue, Gulshan, Dhaka 1212"
+PHONE = "+880 1711 123456"
+
+
 class OrderTestCase(APITestCase):
-    """Two users, one product with 5 units in stock."""
+    """Two users with complete profiles, one product with 5 units in stock."""
 
     def setUp(self):
-        self.alice = User.objects.create_user("alice", password="StrongPass!234")
+        self.alice = User.objects.create_user(
+            "alice", email="alice@example.com", password="StrongPass!234"
+        )
         self.bob = User.objects.create_user("bob", password="StrongPass!234")
         self.alice_token = Token.objects.create(user=self.alice)
         self.bob_token = Token.objects.create(user=self.bob)
+
+        # Both can order, which is the ordinary case. The tests that care
+        # about missing details empty these out themselves.
+        for user in (self.alice, self.bob):
+            profile = user.profile
+            profile.phone = PHONE
+            profile.address = PROFILE_ADDRESS
+            profile.save()
 
         self.category = Category.objects.create(name="Phones")
         self.product = Product.objects.create(
@@ -39,10 +55,21 @@ class OrderTestCase(APITestCase):
     def authenticate(self, token):
         self.client.credentials(HTTP_AUTHORIZATION=f"Token {token.key}")
 
-    def place_order(self, quantity=1, product=None):
+    def place_order(self, quantity=1, product=None, **extra):
+        """Place an order, typing in a delivery address by default.
+
+        `extra` overrides or adds fields, which is how the delivery tests
+        below ask for the profile address instead, or leave it out entirely.
+        """
+        payload = {
+            "product_id": (product or self.product).id,
+            "quantity": quantity,
+            "delivery_address": ADDRESS,
+            **extra,
+        }
         return self.client.post(
             reverse("order-list"),
-            {"product_id": (product or self.product).id, "quantity": quantity},
+            {key: value for key, value in payload.items() if value is not None},
             format="json",
         )
 
@@ -79,6 +106,7 @@ class CreateOrderTests(OrderTestCase):
             {
                 "product_id": self.product.id,
                 "quantity": 1,
+                "delivery_address": ADDRESS,
                 "unit_price": "0.01",
                 "total_price": "0.01",
             },
@@ -161,7 +189,7 @@ class CreateOrderTests(OrderTestCase):
 
         response = self.client.post(
             reverse("order-list"),
-            {"product_id": 9999, "quantity": 1},
+            {"product_id": 9999, "quantity": 1, "delivery_address": ADDRESS},
             format="json",
         )
 
@@ -188,12 +216,16 @@ class ViewOrderTests(OrderTestCase):
             product=self.product,
             quantity=1,
             unit_price=self.product.price,
+            delivery_address=ADDRESS,
+            delivery_phone=PHONE,
         )
         self.bob_order = Order.objects.create(
             user=self.bob,
             product=self.product,
             quantity=2,
             unit_price=self.product.price,
+            delivery_address=ADDRESS,
+            delivery_phone=PHONE,
         )
 
     def test_listing_orders_requires_a_token(self):
@@ -252,6 +284,8 @@ class ViewOrderTests(OrderTestCase):
             product=self.product,
             quantity=1,
             unit_price=self.product.price,
+            delivery_address=ADDRESS,
+            delivery_phone=PHONE,
         )
         self.authenticate(self.alice_token)
 
@@ -259,3 +293,162 @@ class ViewOrderTests(OrderTestCase):
 
         ids = [row["id"] for row in response.data["results"]]
         self.assertEqual(ids, [newer.id, self.alice_order.id])
+
+
+class DeliveryAddressTests(OrderTestCase):
+    """Where an order goes, and the two ways a customer can say so.
+
+    An address is required, because an order that cannot be delivered is not
+    an order. It may be typed in for this one purchase, or taken from the
+    profile — and either way it is snapshotted onto the order, so moving
+    house later does not rewrite where last month's parcel went.
+    """
+
+    def test_typed_address_is_stored_on_the_order(self):
+        self.authenticate(self.alice_token)
+
+        response = self.place_order(delivery_address=ADDRESS)
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.data["delivery_address"], ADDRESS)
+        self.assertEqual(Order.objects.get().delivery_address, ADDRESS)
+
+    def test_address_is_required(self):
+        """The field is named in the error, so a form can point at it."""
+        self.authenticate(self.alice_token)
+
+        response = self.place_order(delivery_address=None)
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("delivery_address", response.data)
+        self.assertEqual(Order.objects.count(), 0)
+
+    def test_a_refused_address_leaves_stock_untouched(self):
+        """Nothing is half-done: no order, and the units stay on the shelf."""
+        self.authenticate(self.alice_token)
+
+        response = self.place_order(quantity=2, delivery_address="")
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.product.refresh_from_db()
+        self.assertEqual(self.product.stock, 5)
+        self.assertEqual(Order.objects.count(), 0)
+
+    def test_a_vague_address_is_refused(self):
+        self.authenticate(self.alice_token)
+
+        response = self.place_order(delivery_address="home")
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("delivery_address", response.data)
+
+    def test_profile_address_can_be_used_instead(self):
+        """The "deliver to my saved address" option."""
+        self.authenticate(self.alice_token)
+
+        response = self.place_order(
+            delivery_address=None, use_profile_address=True
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.data["delivery_address"], PROFILE_ADDRESS)
+        self.assertEqual(response.data["delivery_phone"], PHONE)
+
+    def test_profile_address_wins_over_a_typed_one_when_asked_for(self):
+        """The customer chose the saved address; stale form text is ignored."""
+        self.authenticate(self.alice_token)
+
+        response = self.place_order(
+            delivery_address=ADDRESS, use_profile_address=True
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.data["delivery_address"], PROFILE_ADDRESS)
+
+    def test_asking_for_a_profile_address_that_is_not_there_is_refused(self):
+        """And says what to do about it, rather than failing silently."""
+        profile = self.alice.profile
+        profile.address = ""
+        profile.save()
+        self.authenticate(self.alice_token)
+
+        response = self.place_order(
+            delivery_address=None, use_profile_address=True
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("use_profile_address", response.data)
+        self.assertEqual(Order.objects.count(), 0)
+
+    def test_phone_falls_back_to_the_profile(self):
+        """A number is always recorded, even when the form did not ask."""
+        self.authenticate(self.alice_token)
+
+        response = self.place_order()
+
+        self.assertEqual(response.data["delivery_phone"], PHONE)
+
+    def test_a_typed_phone_is_kept_over_the_profile_one(self):
+        """"Call me on this number instead" has to survive."""
+        self.authenticate(self.alice_token)
+
+        response = self.place_order(delivery_phone="+880 1999 888777")
+
+        self.assertEqual(response.data["delivery_phone"], "+880 1999 888777")
+        self.assertEqual(Order.objects.get().delivery_phone, "+880 1999 888777")
+
+    def test_an_order_without_any_phone_is_refused(self):
+        profile = self.alice.profile
+        profile.phone = ""
+        profile.save()
+        self.authenticate(self.alice_token)
+
+        response = self.place_order()
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("delivery_phone", response.data)
+
+    def test_address_can_be_saved_to_the_profile(self):
+        """The "use this as my default from now on" option."""
+        new_address = "Plot 7, Sector 11, Uttara, Dhaka 1230"
+        self.authenticate(self.alice_token)
+
+        response = self.place_order(
+            delivery_address=new_address, save_to_profile=True
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.alice.profile.refresh_from_db()
+        self.assertEqual(self.alice.profile.address, new_address)
+
+    def test_the_profile_is_left_alone_unless_asked(self):
+        self.authenticate(self.alice_token)
+
+        self.place_order(delivery_address="Plot 7, Sector 11, Uttara, Dhaka")
+
+        self.alice.profile.refresh_from_db()
+        self.assertEqual(self.alice.profile.address, PROFILE_ADDRESS)
+
+    def test_the_address_is_a_snapshot(self):
+        """Moving house does not rewrite where past orders were sent."""
+        self.authenticate(self.alice_token)
+        self.place_order(delivery_address=ADDRESS)
+
+        profile = self.alice.profile
+        profile.address = "Somewhere else entirely, Chattogram 4000"
+        profile.save()
+
+        self.assertEqual(Order.objects.get().delivery_address, ADDRESS)
+
+    def test_a_customer_cannot_order_to_someone_elses_saved_address(self):
+        """`use_profile_address` reads the token owner's profile, no one else's."""
+        self.authenticate(self.bob_token)
+        bobs_profile = self.bob.profile
+        bobs_profile.address = "Bob House, 1 Bob Road, Dhaka 1000"
+        bobs_profile.save()
+
+        response = self.place_order(
+            delivery_address=None, use_profile_address=True
+        )
+
+        self.assertEqual(response.data["delivery_address"], bobs_profile.address)

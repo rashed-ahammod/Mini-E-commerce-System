@@ -56,8 +56,13 @@ Things worth trying:
   be shared as a link
 - find **Vivo X21** or **Samsung Galaxy S8** — both are out of stock, so
   their cards are greyed out and marked *Sold out*
-- add something to the cart and check out — the order appears under
-  **My orders**, and the product's stock goes down
+- add something to the cart and check out — the delivery address is
+  prefilled from your profile, with the option to send this one order
+  somewhere else; the order then appears under **My orders**, and the
+  product's stock goes down
+- open **your profile** from the navbar and clear out the phone number: the
+  avatar picks up a warning dot, and checkout asks for it before it will
+  take an order
 - try to order more units than are in stock, and the server refuses with the
   exact quantity available
 
@@ -202,6 +207,7 @@ Full tables, including every query parameter and status code, are in
 | `POST` | `/api/auth/register/` · `/api/auth/login/` | — |
 | `POST` | `/api/auth/logout/` | token |
 | `GET` | `/api/auth/me/` | token |
+| `GET` `PATCH` `PUT` | `/api/auth/profile/` | token |
 | `GET` | `/api/categories/` · `/api/categories/{id}/` | — |
 | `POST` `PUT` `PATCH` `DELETE` | `/api/categories/…` | token |
 | `GET` | `/api/products/` · `/api/products/{id}/` | — |
@@ -225,10 +231,42 @@ TOKEN=$(curl -s -X POST http://127.0.0.1:8000/api/auth/login/ \
   -H "Content-Type: application/json" \
   -d '{"username":"demo","password":"demo12345"}' | python -c "import json,sys;print(json.load(sys.stdin)['token'])")
 
+# An order needs somewhere to go. Either type an address...
 curl -X POST http://127.0.0.1:8000/api/orders/ \
   -H "Authorization: Token $TOKEN" -H "Content-Type: application/json" \
-  -d '{"product_id": 1, "quantity": 2}'
+  -d '{"product_id": 1, "quantity": 2,
+       "delivery_address": "House 12, Road 5, Dhanmondi, Dhaka 1205"}'
+
+# ...or ask for the one saved on the profile.
+curl -X POST http://127.0.0.1:8000/api/orders/ \
+  -H "Authorization: Token $TOKEN" -H "Content-Type: application/json" \
+  -d '{"product_id": 1, "quantity": 2, "use_profile_address": true}'
 ```
+
+### Profiles and delivery addresses
+
+Every account carries an **email address, a phone number and a delivery
+address**, and all three are required: an order that cannot reach anybody is
+not an order. Registration asks for them, `/api/auth/profile/` edits them,
+and `PATCH`ing one of them blank is refused — a requirement a later request
+can quietly undo is not a requirement.
+
+The account's own details live behind `/api/auth/profile/`, which takes **no
+id**: the token decides whose profile it is, so the endpoint cannot be
+aimed at someone else. Changing another person's details is an organization
+job, under `/api/org/`.
+
+Checkout then asks where this particular order should go. A customer can
+type an address, or tick **use my profile address** — which sends
+`use_profile_address`, so the server reads the address off the profile
+rather than trusting a value that travelled through the browser. Ticking
+**save this as my profile address** (`save_to_profile`) stores a typed
+address as the new default.
+
+Whichever route it arrives by, the address is **snapshotted onto the
+order**, exactly as the unit price is. Moving house next year must not
+rewrite the address a courier delivered to last month, so the organization
+console shows both: where the order went, and where the customer lives now.
 
 ## The organization side
 

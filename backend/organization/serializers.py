@@ -20,11 +20,22 @@ User = get_user_model()
 
 
 class OrderCustomerSerializer(serializers.ModelSerializer):
-    """The customer behind an order, as the organization needs to see them."""
+    """The customer behind an order, as the organization needs to see them.
+
+    `phone` and `address` are the profile's *current* details. They are not
+    what the order is delivered to — that is snapshotted on the order itself
+    — but staff handling a delivery problem need a way to reach the person
+    today, which is a different question.
+    """
+
+    phone = serializers.CharField(source="profile.phone", read_only=True, default="")
+    address = serializers.CharField(
+        source="profile.address", read_only=True, default=""
+    )
 
     class Meta:
         model = User
-        fields = ["id", "username", "email", "date_joined"]
+        fields = ["id", "username", "email", "phone", "address", "date_joined"]
         read_only_fields = fields
 
 
@@ -70,6 +81,8 @@ class OrgOrderListSerializer(serializers.ModelSerializer):
             "quantity",
             "unit_price",
             "total_price",
+            "delivery_address",
+            "delivery_phone",
             "status",
             "status_display",
             "status_updated_at",
@@ -208,10 +221,21 @@ class CustomerDetailSerializer(CustomerListSerializer):
     """
 
     phone = serializers.CharField(source="profile.phone", read_only=True, default="")
+    address = serializers.CharField(
+        source="profile.address", read_only=True, default=""
+    )
+    profile_complete = serializers.BooleanField(
+        source="profile.is_complete", read_only=True, default=False
+    )
     recent_orders = serializers.SerializerMethodField()
 
     class Meta(CustomerListSerializer.Meta):
-        fields = CustomerListSerializer.Meta.fields + ["phone", "recent_orders"]
+        fields = CustomerListSerializer.Meta.fields + [
+            "phone",
+            "address",
+            "profile_complete",
+            "recent_orders",
+        ]
         read_only_fields = fields
 
     def get_recent_orders(self, user):

@@ -33,6 +33,7 @@ def api_root(request):
             "login": reverse("login", request=request),
             "logout": reverse("logout", request=request),
             "me": reverse("me", request=request),
+            "profile": reverse("my-profile", request=request),
             "categories": reverse("category-list", request=request),
             "products": reverse("product-list", request=request),
             "orders": reverse("order-list", request=request),
