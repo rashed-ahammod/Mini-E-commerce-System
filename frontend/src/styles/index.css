@@ -151,15 +151,6 @@ img {
   padding: 28px 20px 64px;
 }
 
-.app__footer {
-  border-top: 1px solid var(--border);
-  background: var(--surface);
-  padding: 22px 20px;
-  text-align: center;
-  color: var(--text-muted);
-  font-size: 0.85rem;
-}
-
 /* ===== navbar =========================================================== */
 
 .navbar {

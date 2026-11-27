@@ -1,4 +1,4 @@
-/** Page frame: navigation on top, routed page in the middle, footer below. */
+/** Page frame: navigation on top, routed page below it. */
 
 import { Outlet } from 'react-router-dom';
 
@@ -11,9 +11,6 @@ export default function Layout() {
       <main className="app__main">
         <Outlet />
       </main>
-      <footer className="app__footer">
-        Mini E-commerce — React frontend for the Django REST API.
-      </footer>
     </div>
   );
 }
