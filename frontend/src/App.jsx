@@ -16,6 +16,8 @@ import ProtectedRoute from './components/ProtectedRoute';
 import OrgLayout from './org/components/OrgLayout';
 import OrganizationRoute from './org/OrganizationRoute';
 import OrgDashboardPage from './org/pages/OrgDashboardPage';
+import OrgOrderDetailPage from './org/pages/OrgOrderDetailPage';
+import OrgOrdersPage from './org/pages/OrgOrdersPage';
 import CartPage from './pages/CartPage';
 import LoginPage from './pages/LoginPage';
 import NotFoundPage from './pages/NotFoundPage';
@@ -68,6 +70,8 @@ export default function App() {
         }
       >
         <Route index element={<OrgDashboardPage />} />
+        <Route path="orders" element={<OrgOrdersPage />} />
+        <Route path="orders/:id" element={<OrgOrderDetailPage />} />
       </Route>
     </Routes>
   );
