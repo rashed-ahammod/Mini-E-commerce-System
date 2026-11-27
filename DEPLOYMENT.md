@@ -153,6 +153,7 @@ Render dashboard → **New → Web Service**, then:
 | `DJANGO_DEBUG` | `False` |
 | `DATABASE_URL` | the Neon connection string, including `?sslmode=require` |
 | `CORS_ALLOWED_ORIGINS` | the Vercel URL, e.g. `https://mini-e-commerce-system-one.vercel.app` |
+| `CLOUDINARY_URL` | needed only if you upload pictures — see section 5 |
 | `PYTHON_VERSION` | `3.13.5` |
 | `SEED_DATA` | `true` for the first deploy, then `false` |
 | `DJANGO_SUPERUSER_USERNAME` / `_EMAIL` / `_PASSWORD` | optional, creates an admin during the build |
@@ -231,11 +232,12 @@ browser.
   up. The frontend shows its loading states during that time, but a reviewer
   opening the link cold will notice. Mention it in your submission, or keep
   the service warm with a scheduled ping.
-- **Uploaded images do not survive a deploy.** `Product.image` writes to the
-  local filesystem, which Render wipes on each deploy. The seeded catalog has
-  no images, so this only matters if you upload some. Fixing it properly
-  means object storage (Cloudinary, S3) — out of scope here, but worth
-  knowing before you demo an upload.
+- **Uploaded images need Cloudinary.** `Product.image` writes through
+  Django's storage backend. Without `CLOUDINARY_URL` that is the container's
+  own disk, which Render replaces on every deploy — so an uploaded picture
+  is gone with the next release while the database row still points at it.
+  Set `CLOUDINARY_URL` (section 5) and the bytes go somewhere permanent
+  instead. Linked pictures (`image_url`) are unaffected either way.
 - **Neon suspends an idle database.** The first query after a quiet period
   pays a small resume cost. This is separate from, and much shorter than,
   Render's own cold start.
@@ -243,7 +245,72 @@ browser.
 
 ---
 
-## 5. After the first successful deploy
+## 5. Uploaded pictures (Cloudinary)
+
+Only needed if you want to **upload** product photographs. Products that
+link to an image (`image_url`) work without any of this, which is what the
+seeded catalog does.
+
+### Why it is needed at all
+
+`Product.image` is a `CharField` holding a path — `products/photo.png` — not
+the picture. The bytes go wherever Django's storage backend puts them. By
+default that is the web container's own disk, and Render builds a brand new
+container on every deploy, so:
+
+```
+Neon still has     image = 'products/photo.png'   ✅ the row survives
+the new container  /media/products/photo.png      ❌ empty disk
+result             a row pointing at a file that no longer exists
+```
+
+The database is not the problem — it never held the file.
+
+### Setting it up
+
+1. Sign up at <https://cloudinary.com> (the free tier is generous: ~25GB
+   storage and transformations).
+2. On the dashboard, copy the **API environment variable**. It looks like:
+
+   ```
+   cloudinary://123456789012345:abcdefg_hijklmnop@your-cloud-name
+   ```
+
+   It carries the cloud name, key and secret together, so it is the only
+   value you need — treat it as a password.
+3. In Render → your service → **Environment**, add:
+
+   | Variable | Value |
+   | --- | --- |
+   | `CLOUDINARY_URL` | the URL you copied |
+
+4. Save. Render restarts, and uploads now go to Cloudinary.
+
+Nothing else changes: the model still uses an `ImageField`, the API still
+takes the same multipart request, and the console's upload button behaves
+identically. Only the storage backend underneath is different.
+
+### Checking it worked
+
+Upload a picture from the console (`/org/products` → Edit → Upload a file)
+and look at the product in the API:
+
+```bash
+curl https://<your-service>.onrender.com/api/products/<id>/ | grep image
+```
+
+The `image` URL should now begin `https://res.cloudinary.com/…` rather than
+`https://<your-service>.onrender.com/media/…`. Redeploy and fetch it again —
+it should still be there.
+
+### Leaving it unset
+
+Locally, `CLOUDINARY_URL` is unset and uploads go to `backend/media/` as
+before. That keeps development offline and the test suite off the network.
+Pictures uploaded in development do not appear in production and vice
+versa, which is usually what you want.
+
+## 6. After the first successful deploy
 
 1. Set `SEED_DATA` back to `false` so later deploys do not re-run the seed.
 2. Remove `DJANGO_SUPERUSER_PASSWORD` from the environment once the admin

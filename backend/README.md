@@ -207,12 +207,21 @@ curl -X PATCH https://your-api/api/products/1/   -H "Authorization: Token <organ
 Sending `image_upload=` empty clears the stored file, after which `image`
 falls back to `image_url`.
 
-**Uploads do not survive a deploy.** Render wipes the filesystem on every
-release, so an uploaded photo disappears with the next one — which is why
-the seeded catalog uses `image_url`, and why the console offers both and
-says which is which. If uploads need to persist, the fix is object storage
-(Cloudinary, S3) behind Django's storage backend; nothing else in the code
-would change.
+**Where the bytes go depends on `CLOUDINARY_URL`.** `Product.image` stores a
+path (`products/photo.png`), never the picture itself; the bytes go wherever
+Django's storage backend puts them:
+
+| `CLOUDINARY_URL` | Uploads land in | Survive a deploy? |
+| --- | --- | --- |
+| unset (development) | `backend/media/` | n/a — your own machine |
+| unset (on Render) | the container's disk | ❌ the next release wipes it |
+| set | Cloudinary | ✅ |
+
+Setting it switches `STORAGES["default"]` to Cloudinary and changes nothing
+else — same `ImageField`, same serializer, same multipart request from the
+console. Setup is in [../DEPLOYMENT.md](../DEPLOYMENT.md#5-uploaded-pictures-cloudinary).
+Linked pictures (`image_url`) are unaffected either way, which is why the
+seeded catalog uses them.
 
 `/media/` is served by Django itself rather than only in `DEBUG`. Django's
 `static()` helper returns nothing when `DEBUG` is off, which would leave

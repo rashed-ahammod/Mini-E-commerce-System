@@ -187,21 +187,64 @@ USE_TZ = True
 STATIC_URL = "static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
 
+MEDIA_URL = "media/"
+MEDIA_ROOT = BASE_DIR / "media"
+
+# Django 5 configures both halves through STORAGES. "default" is where
+# uploaded files go (product photographs); "staticfiles" is CSS and the
+# admin's assets.
+STORAGES = {
+    "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},
+    "staticfiles": {
+        "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage"
+    },
+}
+
 if not DEBUG:
     # In production WhiteNoise serves the files collected by `collectstatic`
     # and the manifest storage adds cache-busting hashes to their names.
     # In development the staticfiles app already serves them, and enabling
     # this before `collectstatic` has run only produces warnings.
     MIDDLEWARE.insert(2, "whitenoise.middleware.WhiteNoiseMiddleware")
-    STORAGES = {
-        "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},
-        "staticfiles": {
-            "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage"
-        },
+    STORAGES["staticfiles"] = {
+        "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage"
     }
 
-MEDIA_URL = "media/"
-MEDIA_ROOT = BASE_DIR / "media"
+
+# --------------------------------------------------------------------------
+# Cloudinary (optional) — where uploaded pictures actually live
+# --------------------------------------------------------------------------
+# A host like Render replaces the whole container on every deploy, so a file
+# written to local disk is gone with the next release. The database keeps the
+# path either way — `Product.image` stores "products/photo.png", not the
+# bytes — which is why the row survives and the picture does not.
+#
+# Setting CLOUDINARY_URL moves the bytes to Cloudinary instead. Nothing else
+# changes: the model still uses an ImageField, the serializer still resolves
+# `image`, and the frontend still posts the same multipart request. Only the
+# storage backend underneath is different.
+#
+# Left unset — as it is in development — uploads go to MEDIA_ROOT as before,
+# which keeps local work offline and the test suite off the network.
+
+CLOUDINARY_URL = os.getenv("CLOUDINARY_URL", "")
+USE_CLOUDINARY = bool(CLOUDINARY_URL)
+
+if USE_CLOUDINARY:
+    # cloudinary_storage must come before staticfiles, per its documentation.
+    INSTALLED_APPS = (
+        DJANGO_APPS[:-1]  # everything up to staticfiles
+        + ["cloudinary_storage", "django.contrib.staticfiles", "cloudinary"]
+        + THIRD_PARTY_APPS
+        + LOCAL_APPS
+    )
+    STORAGES["default"] = {
+        "BACKEND": "cloudinary_storage.storage.MediaCloudinaryStorage"
+    }
+    # The library reads CLOUDINARY_URL from the environment itself; this
+    # mirrors it into Django settings so `manage.py db_info`-style checks and
+    # the admin can report what is in use.
+    CLOUDINARY_STORAGE = {"CLOUDINARY_URL": CLOUDINARY_URL}
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 

@@ -170,8 +170,9 @@ signed out immediately.
 #### Product pictures
 
 The product form offers both an upload and a link, because they fail
-differently: an uploaded file is wiped by the next deploy, a link survives
-but depends on someone else's server. The field says so rather than letting
+differently: a link depends on someone else's server staying up, while an
+upload depends on where the backend stores it — the container's own disk,
+wiped by the next deploy, unless `CLOUDINARY_URL` is configured there. The field says so rather than letting
 the choice look arbitrary, previews whichever applies, and refuses a file
 over 2MB or one that is not an image before it reaches the server.
 

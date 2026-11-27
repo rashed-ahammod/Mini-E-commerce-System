@@ -59,6 +59,14 @@ services:
       - key: DJANGO_DB_DISABLE_SERVER_SIDE_CURSORS
         value: "False"
 
+      # Where uploaded product photographs are stored. Without this they go
+      # to the container's disk, which Render replaces on every deploy, so
+      # an uploaded picture disappears with the next release. Copy the whole
+      # URL from the Cloudinary dashboard:
+      #   cloudinary://<api_key>:<api_secret>@<cloud_name>
+      - key: CLOUDINARY_URL
+        sync: false
+
       # The deployed Vercel URL, e.g. https://mini-e-commerce-system-one.vercel.app
       # Set it after the frontend's first deploy.
       - key: CORS_ALLOWED_ORIGINS
