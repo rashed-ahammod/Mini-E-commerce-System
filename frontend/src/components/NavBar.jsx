@@ -25,6 +25,13 @@ export default function NavBar() {
             {itemCount > 0 && <span className="badge">{itemCount}</span>}
           </NavLink>
           {isAuthenticated && <NavLink to="/orders">My orders</NavLink>}
+          {/* Only organization accounts are shown the way in; a customer
+              would only reach a redirect. */}
+          {user?.is_organization && (
+            <NavLink to="/org" className="navbar__ops">
+              Operations
+            </NavLink>
+          )}
         </nav>
 
         <div className="navbar__account">

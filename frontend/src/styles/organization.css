@@ -1,0 +1,489 @@
+/**
+ * The organization console.
+ *
+ * Kept in its own file, and deliberately a different look from the shop: a
+ * dark rail, denser type, flatter surfaces. Someone who can both shop and
+ * run the shop should always know which one they are looking at.
+ *
+ * It reuses the shop's tokens rather than inventing a second palette, with
+ * a few of its own for the rail and the status pills.
+ */
+
+:root {
+  --org-rail: #141a22;
+  --org-rail-text: #c3ccd8;
+  --org-rail-active: #2b5cff;
+  --org-rail-width: 232px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --org-rail: #0c0f14;
+    --org-rail-text: #98a3b2;
+  }
+}
+
+/* ===== shell ============================================================ */
+
+.org {
+  display: grid;
+  grid-template-columns: var(--org-rail-width) minmax(0, 1fr);
+  min-height: 100vh;
+  background: var(--bg);
+}
+
+.org__rail {
+  display: flex;
+  flex-direction: column;
+  background: var(--org-rail);
+  color: var(--org-rail-text);
+  padding: 20px 14px;
+  position: sticky;
+  top: 0;
+  height: 100vh;
+}
+
+.org__brand {
+  padding: 0 10px 18px;
+  border-bottom: 1px solid rgb(255 255 255 / 8%);
+}
+
+.org__brand-mark {
+  display: block;
+  font-size: 1.3rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: #fff;
+}
+
+.org__brand-sub {
+  display: block;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: rgb(255 255 255 / 45%);
+  margin-top: 2px;
+}
+
+.org__nav {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: 16px;
+  flex: 1;
+}
+
+.org__nav a {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 10px;
+  border-radius: var(--radius-sm);
+  color: var(--org-rail-text);
+  font-size: 0.9rem;
+  font-weight: 500;
+  transition: background 0.15s, color 0.15s;
+}
+
+.org__nav a svg {
+  width: 17px;
+  height: 17px;
+  flex: none;
+  opacity: 0.8;
+}
+
+.org__nav a:hover {
+  background: rgb(255 255 255 / 6%);
+  color: #fff;
+  text-decoration: none;
+}
+
+.org__nav a.active {
+  background: var(--org-rail-active);
+  color: #fff;
+}
+
+.org__nav a.active svg {
+  opacity: 1;
+}
+
+.org__who {
+  padding: 14px 10px 0;
+  border-top: 1px solid rgb(255 255 255 / 8%);
+  font-size: 0.8rem;
+}
+
+.org__who-name {
+  margin: 0;
+  color: #fff;
+  font-weight: 600;
+}
+
+.org__who-role {
+  margin: 1px 0 10px;
+  color: rgb(255 255 255 / 45%);
+  font-size: 0.74rem;
+}
+
+.org__exit {
+  color: var(--org-rail-text);
+  font-size: 0.8rem;
+}
+
+.org__content {
+  min-width: 0;
+  padding: 26px 28px 56px;
+}
+
+.org-page {
+  max-width: 1180px;
+}
+
+.org-page__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--gap);
+  flex-wrap: wrap;
+  margin-bottom: 22px;
+}
+
+.org-page__header h1 {
+  margin-bottom: 2px;
+}
+
+.org-page__header p {
+  margin: 0;
+  font-size: 0.875rem;
+}
+
+/* a way into the console from the shop */
+.navbar__ops.active,
+.navbar__ops {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+/* ===== stat tiles ======================================================= */
+
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 14px;
+  margin-bottom: 22px;
+}
+
+.stat {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px 18px;
+  box-shadow: var(--shadow-sm);
+}
+
+.stat--action {
+  border-color: var(--accent);
+}
+
+.stat__label {
+  margin: 0 0 6px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--text-subtle);
+}
+
+.stat__value {
+  margin: 0;
+  font-size: 1.7rem;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums;
+}
+
+.stat__note {
+  margin: 5px 0 0;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+
+/* ===== panels and columns =============================================== */
+
+.org-columns {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(260px, 1fr);
+  gap: 18px;
+  align-items: start;
+}
+
+.org-columns__main,
+.org-columns__side {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  min-width: 0;
+}
+
+.panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+}
+
+.panel__header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 13px 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.panel__header h2 {
+  margin: 0;
+  font-size: 0.95rem;
+}
+
+.panel__header span {
+  font-size: 0.78rem;
+}
+
+.panel > .table {
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.panel > .status,
+.panel > .alert {
+  margin: 16px;
+  padding: 16px 0;
+}
+
+/* ===== sparkline ======================================================== */
+
+.spark {
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 120px;
+  padding: 16px;
+}
+
+.spark__col {
+  flex: 1;
+  height: 100%;
+  display: flex;
+  align-items: flex-end;
+}
+
+.spark__bar {
+  width: 100%;
+  border-radius: 3px 3px 0 0;
+  background: var(--accent);
+  transition: opacity 0.15s;
+}
+
+.spark__bar.is-empty {
+  background: var(--border-strong);
+}
+
+.spark__col:hover .spark__bar {
+  opacity: 0.75;
+}
+
+/* ===== breakdown, stacks, facts ========================================= */
+
+.breakdown {
+  list-style: none;
+  margin: 0;
+  padding: 6px 0;
+}
+
+.breakdown li {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 16px;
+}
+
+.breakdown__count {
+  margin-left: auto;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.breakdown__value {
+  width: 110px;
+  text-align: right;
+  font-size: 0.85rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.stack {
+  list-style: none;
+  margin: 0;
+  padding: 6px 0;
+}
+
+.stack__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 9px 16px;
+  color: var(--text);
+  font-size: 0.875rem;
+}
+
+.stack__row:hover {
+  background: var(--surface-muted);
+  text-decoration: none;
+}
+
+.facts {
+  margin: 0;
+  padding: 6px 0;
+}
+
+.facts > div {
+  display: flex;
+  justify-content: space-between;
+  padding: 7px 16px;
+  font-size: 0.875rem;
+}
+
+.facts dt {
+  color: var(--text-muted);
+}
+
+.facts dd {
+  margin: 0;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ===== status pills ===================================================== */
+
+.pill {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.pill--wait {
+  background: var(--warn-soft);
+  color: var(--warn);
+}
+
+.pill--info {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.pill--go {
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
+  color: var(--accent);
+}
+
+.pill--ok {
+  background: var(--ok-soft);
+  color: var(--ok);
+}
+
+.pill--off {
+  background: var(--surface-sunken);
+  color: var(--text-muted);
+}
+
+/* ===== segmented control ================================================ */
+
+.segmented {
+  display: inline-flex;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  background: var(--surface);
+}
+
+.segmented button {
+  padding: 7px 14px;
+  border: 0;
+  background: transparent;
+  color: var(--text-muted);
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.segmented button + button {
+  border-left: 1px solid var(--border);
+}
+
+.segmented button:hover {
+  background: var(--surface-muted);
+  color: var(--text);
+}
+
+.segmented button.is-active {
+  background: var(--accent);
+  color: var(--accent-text);
+}
+
+/* ===== responsive ======================================================= */
+
+@media (max-width: 1040px) {
+  .org-columns {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 820px) {
+  /* The rail becomes a strip across the top: a 232px column on a phone
+     leaves no room for a table. */
+  .org {
+    grid-template-columns: 1fr;
+  }
+
+  .org__rail {
+    position: static;
+    height: auto;
+    flex-direction: row;
+    align-items: center;
+    gap: var(--gap);
+    padding: 12px 16px;
+    overflow-x: auto;
+  }
+
+  .org__brand-sub,
+  .org__who-role,
+  .org__who-name {
+    display: none;
+  }
+
+  .org__brand {
+    border: 0;
+    padding: 0;
+  }
+
+  .org__nav {
+    flex-direction: row;
+    margin: 0;
+  }
+
+  .org__who {
+    border: 0;
+    padding: 0;
+  }
+
+  .org__content {
+    padding: 18px 16px 48px;
+  }
+}

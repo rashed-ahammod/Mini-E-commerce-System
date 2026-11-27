@@ -14,6 +14,7 @@ import App from './App';
 import { AuthProvider } from './auth/AuthProvider';
 import { CartProvider } from './cart/CartProvider';
 import './styles/index.css';
+import './styles/organization.css';
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>

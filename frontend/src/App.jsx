@@ -1,15 +1,21 @@
 /**
  * Routes.
  *
- * Everything sits inside <Layout>, which draws the navigation and footer.
- * Checkout and order history are wrapped in <ProtectedRoute>, which is the
- * only place the app decides a page needs a logged-in user.
+ * Two trees. The shop sits inside <Layout>; the organization console sits
+ * under /org inside <OrgLayout>, gated by <OrganizationRoute>.
+ *
+ * Access is decided in exactly two components — <ProtectedRoute> for "needs
+ * a login" and <OrganizationRoute> for "needs the right kind of account" —
+ * so no page has to remember to check for itself.
  */
 
 import { Route, Routes } from 'react-router-dom';
 
 import Layout from './components/Layout';
 import ProtectedRoute from './components/ProtectedRoute';
+import OrgLayout from './org/components/OrgLayout';
+import OrganizationRoute from './org/OrganizationRoute';
+import OrgDashboardPage from './org/pages/OrgDashboardPage';
 import CartPage from './pages/CartPage';
 import LoginPage from './pages/LoginPage';
 import NotFoundPage from './pages/NotFoundPage';
@@ -49,6 +55,19 @@ export default function App() {
         />
 
         <Route path="*" element={<NotFoundPage />} />
+      </Route>
+
+      {/* The organization console. Its own layout, because it is a
+          different job from shopping and should not look like it. */}
+      <Route
+        path="/org"
+        element={
+          <OrganizationRoute>
+            <OrgLayout />
+          </OrganizationRoute>
+        }
+      >
+        <Route index element={<OrgDashboardPage />} />
       </Route>
     </Routes>
   );

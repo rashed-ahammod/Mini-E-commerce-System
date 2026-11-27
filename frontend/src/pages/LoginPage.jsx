@@ -31,8 +31,13 @@ export default function LoginPage() {
     setSubmitting(true);
 
     try {
-      await login(form);
-      navigate(redirectTo, { replace: true });
+      const loggedIn = await login(form);
+      // Send organization users to the console unless they were heading
+      // somewhere specific, which is the case when a guard redirected them
+      // here. Customers always land where they were going.
+      const destination =
+        location.state?.from || !loggedIn.is_organization ? redirectTo : '/org';
+      navigate(destination, { replace: true });
     } catch (err) {
       setError(err.message);
       setSubmitting(false);
