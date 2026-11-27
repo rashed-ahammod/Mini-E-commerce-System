@@ -161,3 +161,68 @@ class DashboardQuerySerializer(serializers.Serializer):
         required=False, default=5, min_value=0, max_value=1000,
         help_text="Stock at or below this counts as running low.",
     )
+
+
+# ---------------------------------------------------------------------------
+# Customers
+# ---------------------------------------------------------------------------
+
+
+class CustomerListSerializer(serializers.ModelSerializer):
+    """A customer as the organization sees them in the customer list.
+
+    The three figures are annotated onto the queryset by the viewset, so the
+    list costs one query however many customers there are.
+    """
+
+    order_count = serializers.IntegerField(read_only=True)
+    total_spent = serializers.DecimalField(
+        max_digits=14, decimal_places=2, read_only=True
+    )
+    last_order_at = serializers.DateTimeField(read_only=True, allow_null=True)
+
+    class Meta:
+        model = User
+        fields = [
+            "id",
+            "username",
+            "email",
+            "is_active",
+            "date_joined",
+            "last_login",
+            "order_count",
+            "total_spent",
+            "last_order_at",
+        ]
+        read_only_fields = fields
+
+
+class CustomerDetailSerializer(CustomerListSerializer):
+    """One customer, with their recent orders attached.
+
+    Capped at the most recent few: a customer's full history belongs on the
+    order list, filtered by customer, where it can be paginated.
+    """
+
+    phone = serializers.CharField(source="profile.phone", read_only=True, default="")
+    recent_orders = serializers.SerializerMethodField()
+
+    class Meta(CustomerListSerializer.Meta):
+        fields = CustomerListSerializer.Meta.fields + ["phone", "recent_orders"]
+        read_only_fields = fields
+
+    def get_recent_orders(self, user):
+        orders = user.orders.select_related("product").order_by("-created_at")[:10]
+        return OrgOrderListSerializer(
+            orders, many=True, context=self.context
+        ).data
+
+
+class CustomerStatusSerializer(serializers.Serializer):
+    """Input for the deactivate action.
+
+    A reason is required. Blocking someone from signing in is a decision
+    another member of staff may have to explain later.
+    """
+
+    reason = serializers.CharField(max_length=300)
