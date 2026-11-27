@@ -4,6 +4,7 @@ Covers the permission rules, the five CRUD operations, and the filtering,
 searching, ordering and pagination the assignment asks for.
 """
 
+import base64
 from decimal import Decimal
 
 from django.contrib.auth import get_user_model
@@ -392,6 +393,63 @@ class ProductApiTests(CatalogTestCase):
 
         self.assertIn("products/uploaded.jpg", response.data["image"])
         self.assertNotIn("cdn.example.com", response.data["image"])
+
+    def test_a_file_can_be_uploaded_through_the_api(self):
+        """The console's "Upload a file" option posts multipart, not JSON."""
+        from django.core.files.uploadedfile import SimpleUploadedFile
+
+        png = base64.b64decode(
+            "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8"
+            "z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=="
+        )
+        self.authenticate()
+
+        response = self.client.patch(
+            reverse("product-detail", args=[self.cheap_phone.id]),
+            {"image_upload": SimpleUploadedFile("photo.png", png, "image/png")},
+            format="multipart",
+        )
+
+        self.cheap_phone.refresh_from_db()
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertTrue(self.cheap_phone.image)
+        self.assertIn("photo", response.data["image"])
+        self.cheap_phone.image.delete(save=True)
+
+    def test_a_non_image_upload_is_rejected(self):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+
+        self.authenticate()
+
+        response = self.client.patch(
+            reverse("product-detail", args=[self.cheap_phone.id]),
+            {"image_upload": SimpleUploadedFile("notes.txt", b"not an image", "text/plain")},
+            format="multipart",
+        )
+
+        self.cheap_phone.refresh_from_db()
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("image_upload", response.data)
+        self.assertFalse(self.cheap_phone.image)
+
+    def test_a_customer_cannot_upload_a_picture(self):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+
+        png = base64.b64decode(
+            "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8"
+            "z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=="
+        )
+        self.authenticate_as_customer()
+
+        response = self.client.patch(
+            reverse("product-detail", args=[self.cheap_phone.id]),
+            {"image_upload": SimpleUploadedFile("photo.png", png, "image/png")},
+            format="multipart",
+        )
+
+        self.cheap_phone.refresh_from_db()
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertFalse(self.cheap_phone.image)
 
     def test_upload_url_is_absolute(self):
         """The frontend is on another origin, so /media/... would not resolve."""

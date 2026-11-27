@@ -198,9 +198,27 @@ An uploaded file takes precedence over `image_url`, so adding a real photo
 later replaces the seeded link rather than hiding behind it, and upload URLs
 are returned absolute because the frontend runs on a different origin.
 
-The seeded catalog uses `image_url`: hosts such as Render wipe the filesystem
-on every deploy, so uploaded files would vanish and leave the shop
-imageless.
+Uploading is a multipart request rather than JSON:
+
+```bash
+curl -X PATCH https://your-api/api/products/1/   -H "Authorization: Token <organization token>"   -F "image_upload=@photo.jpg"
+```
+
+Sending `image_upload=` empty clears the stored file, after which `image`
+falls back to `image_url`.
+
+**Uploads do not survive a deploy.** Render wipes the filesystem on every
+release, so an uploaded photo disappears with the next one — which is why
+the seeded catalog uses `image_url`, and why the console offers both and
+says which is which. If uploads need to persist, the fix is object storage
+(Cloudinary, S3) behind Django's storage backend; nothing else in the code
+would change.
+
+`/media/` is served by Django itself rather than only in `DEBUG`. Django's
+`static()` helper returns nothing when `DEBUG` is off, which would leave
+uploads 404ing on the deployed site and looking like a broken feature. It is
+not how a busy site should serve media, but this catalog's images are few
+and small.
 
 ### Orders — `/api/orders/`
 

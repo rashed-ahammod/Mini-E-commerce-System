@@ -8,9 +8,9 @@ See the app-level `urls.py` files for the concrete endpoints, or GET
 """
 
 from django.conf import settings
-from django.conf.urls.static import static
 from django.contrib import admin
-from django.urls import include, path
+from django.urls import include, path, re_path
+from django.views.static import serve
 
 from config.views import api_root, health_check
 
@@ -28,5 +28,23 @@ urlpatterns = [
     path("api-auth/", include("rest_framework.urls")),
 ]
 
-if settings.DEBUG:
-    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+# Uploaded files (product photographs). Django's own static serve is used
+# rather than only enabling this in DEBUG, because otherwise an image
+# uploaded through the admin or the console would 404 on the deployed site
+# and look like a bug in the upload.
+#
+# It is not how a busy site should serve media — every request goes through
+# Python — but this catalog's images are small and few. The real limitation
+# is the host: Render's filesystem is wiped on each deploy, so uploads do
+# not survive one. The seeded catalog therefore uses `Product.image_url`,
+# and object storage (Cloudinary, S3) is the fix if uploads must persist.
+# django.conf.urls.static.static() is not used here: it returns an empty
+# list when DEBUG is off, which would leave uploads 404ing on the deployed
+# site and looking like a broken upload feature.
+urlpatterns += [
+    re_path(
+        r"^media/(?P<path>.*)$",
+        serve,
+        {"document_root": settings.MEDIA_ROOT},
+    ),
+]

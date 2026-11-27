@@ -167,6 +167,20 @@ Each dialog states what will actually happen — how many units return to
 which product, that a customer's orders are untouched, that the person is
 signed out immediately.
 
+#### Product pictures
+
+The product form offers both an upload and a link, because they fail
+differently: an uploaded file is wiped by the next deploy, a link survives
+but depends on someone else's server. The field says so rather than letting
+the choice look arbitrary, previews whichever applies, and refuses a file
+over 2MB or one that is not an image before it reaches the server.
+
+Writing a product sends JSON normally and multipart only when a file is
+attached — `productBody()` in [`api/endpoints.js`](src/api/endpoints.js)
+decides which. `imageFile` is three-valued on purpose: absent means leave
+the stored picture alone, a `File` uploads, and `null` removes it. That is
+what keeps a rename from re-uploading or clearing an existing photo.
+
 #### Stock
 
 The product edit form shows stock **read-only**. Writing it back from a form

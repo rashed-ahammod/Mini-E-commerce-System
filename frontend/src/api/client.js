@@ -91,7 +91,8 @@ function describeError(data, status) {
  * @param {string} path   path after /api, e.g. "/products/"
  * @param {object} options
  * @param {string} [options.method]  defaults to GET
- * @param {object} [options.body]    serialised as JSON
+ * @param {object|FormData} [options.body]  serialised as JSON, or sent as
+ *   multipart when it is a FormData (file uploads)
  * @param {object} [options.params]  query string values (empty ones dropped)
  * @param {boolean} [options.auth]   send the stored token (default: true when
  *                                   one exists)
@@ -109,8 +110,14 @@ export async function request(path, options = {}) {
     });
   }
 
+  // FormData is used for file uploads. The browser has to set
+  // Content-Type itself in that case, because the header must carry the
+  // multipart boundary — setting it by hand produces a request the server
+  // cannot parse.
+  const isUpload = typeof FormData !== 'undefined' && body instanceof FormData;
+
   const headers = {};
-  if (body !== undefined) headers['Content-Type'] = 'application/json';
+  if (body !== undefined && !isUpload) headers['Content-Type'] = 'application/json';
 
   const token = auth ? getToken() : null;
   if (token) headers.Authorization = `Token ${token}`;
@@ -118,7 +125,7 @@ export async function request(path, options = {}) {
   const response = await fetch(url, {
     method,
     headers,
-    body: body === undefined ? undefined : JSON.stringify(body),
+    body: body === undefined ? undefined : isUpload ? body : JSON.stringify(body),
     signal,
   });
 

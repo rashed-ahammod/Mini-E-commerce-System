@@ -115,13 +115,35 @@ export const orgApi = {
 // account, so they are grouped here rather than on productApi/categoryApi,
 // where a customer-facing component might reach for them by mistake.
 
+/**
+ * Build the body for a product write.
+ *
+ * A plain object when there is no file, which keeps the common case as
+ * readable JSON. A FormData when there is, because a file cannot travel in
+ * JSON — every value then has to be a string, and `null` has to become an
+ * empty string, which is how DRF reads "clear this field".
+ *
+ * `imageFile` is the File to upload, or `null` to remove an uploaded one.
+ */
+function productBody({ imageFile, ...fields }) {
+  if (imageFile === undefined) return fields;
+
+  const form = new FormData();
+  Object.entries(fields).forEach(([key, value]) => {
+    if (value !== null && value !== undefined) form.append(key, String(value));
+  });
+  // An empty string tells DRF to clear the stored file.
+  form.append('image_upload', imageFile === null ? '' : imageFile);
+  return form;
+}
+
 export const catalogAdminApi = {
   createCategory: (details) => api.post('/categories/', details),
   updateCategory: (id, changes) => api.patch(`/categories/${id}/`, changes),
   deleteCategory: (id) => api.delete(`/categories/${id}/`),
 
-  createProduct: (details) => api.post('/products/', details),
-  updateProduct: (id, changes) => api.patch(`/products/${id}/`, changes),
+  createProduct: (details) => api.post('/products/', productBody(details)),
+  updateProduct: (id, changes) => api.patch(`/products/${id}/`, productBody(changes)),
   deleteProduct: (id) => api.delete(`/products/${id}/`),
 
   /**

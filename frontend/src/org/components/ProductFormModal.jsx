@@ -14,6 +14,7 @@
 import { useState } from 'react';
 
 import Modal from './Modal';
+import ProductImageField from './ProductImageField';
 
 const EMPTY = {
   name: '',
@@ -43,6 +44,18 @@ export default function ProductFormModal({ product, categories, onClose, onSave 
   const [error, setError] = useState(null);
   const [saving, setSaving] = useState(false);
 
+  // `imageFile` is deliberately three-valued:
+  //   undefined  leave whatever is stored alone
+  //   a File     upload this
+  //   null       remove the stored upload
+  const [imageFile, setImageFile] = useState(undefined);
+  // The API resolves `image` from the uploaded file when there is one, and
+  // from `image_url` otherwise. They differ exactly when a file is stored,
+  // which is the only way to tell the two apart from the response.
+  const hasUpload = Boolean(!isNew && product.image && product.image !== product.image_url);
+
+  const [imageMode, setImageMode] = useState(hasUpload ? 'upload' : 'url');
+
   const change = (event) => {
     const { name, value } = event.target;
     setForm((current) => ({ ...current, [name]: value }));
@@ -62,6 +75,9 @@ export default function ProductFormModal({ product, categories, onClose, onSave 
       image_url: form.image_url,
     };
     if (isNew) payload.stock = Number(form.stock || 0);
+    // Only sent when the picture is actually being changed, so saving a
+    // name does not re-upload or clear an existing file.
+    if (imageFile !== undefined) payload.imageFile = imageFile;
 
     try {
       await onSave(payload);
@@ -172,22 +188,19 @@ export default function ProductFormModal({ product, categories, onClose, onSave 
         {errorFor('description')}
       </div>
 
-      <div className="field">
-        <label htmlFor="image_url">Image URL</label>
-        <input
-          id="image_url"
-          name="image_url"
-          type="url"
-          placeholder="https://…"
-          value={form.image_url}
-          onChange={change}
-        />
-        {errorFor('image_url')}
-        <p className="muted auth-form__hint">
-          A link, not an upload: the server's filesystem is wiped on every
-          deploy, so uploaded files would not survive.
-        </p>
-      </div>
+      <ProductImageField
+        mode={imageMode}
+        onModeChange={setImageMode}
+        imageUrl={form.image_url}
+        onImageUrlChange={(value) =>
+          setForm((current) => ({ ...current, image_url: value }))
+        }
+        file={imageFile}
+        onFileChange={setImageFile}
+        existingImage={isNew ? null : product.image}
+        hasUpload={hasUpload}
+        error={errorFor('image_upload') || errorFor('image_url')}
+      />
     </Modal>
   );
 }
