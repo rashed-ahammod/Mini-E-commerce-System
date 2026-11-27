@@ -1857,6 +1857,242 @@ textarea[readonly] {
   font-variant-numeric: tabular-nums;
 }
 
+/* ===== order progress (the customer's view of the lifecycle) ============ */
+
+.progress {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 8px;
+}
+
+.progress__step {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-top: 20px;
+  position: relative;
+  min-width: 0;
+}
+
+/* The connecting line, drawn behind each marker rather than as its own
+   element, so the steps stay a plain list for a screen reader. */
+.progress__step::before {
+  content: '';
+  position: absolute;
+  top: 9px;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: var(--surface-sunken);
+}
+
+.progress__step:first-child::before {
+  left: 9px;
+}
+
+.progress__step:last-child::before {
+  right: calc(100% - 11px);
+}
+
+.progress__step--done::before,
+.progress__step--current::before {
+  background: var(--ok);
+}
+
+.progress__marker {
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--surface-sunken);
+  color: var(--text-subtle);
+  font-size: 0.7rem;
+  font-weight: 700;
+}
+
+.progress__step--done .progress__marker {
+  background: var(--ok);
+  color: var(--surface);
+}
+
+.progress__step--current .progress__marker {
+  background: var(--ok);
+  color: var(--surface);
+  box-shadow: 0 0 0 4px var(--ok-soft);
+}
+
+.progress__body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.progress__label {
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.progress__step--todo .progress__label {
+  color: var(--text-subtle);
+  font-weight: 500;
+}
+
+.progress__note {
+  color: var(--text-muted);
+  font-size: 0.75rem;
+}
+
+.progress__step--todo .progress__note {
+  color: var(--text-subtle);
+}
+
+/* A cancelled order is not a step on the line. */
+.progress--stopped {
+  display: block;
+  padding: 14px 16px;
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--danger);
+  border-radius: var(--radius);
+  background: var(--danger-soft);
+}
+
+.progress__stopped-title {
+  margin: 0 0 4px;
+  font-weight: 600;
+  color: var(--danger);
+}
+
+.progress--stopped p {
+  margin: 0;
+  font-size: 0.85rem;
+}
+
+.progress__stopped-note {
+  margin-top: 6px !important;
+}
+
+/* Five columns do not fit a phone; stack into a vertical line instead. */
+@media (max-width: 720px) {
+  .progress {
+    grid-template-columns: 1fr;
+    gap: 0;
+  }
+
+  .progress__step {
+    padding: 0 0 16px 30px;
+  }
+
+  .progress__step::before {
+    top: 10px;
+    bottom: -10px;
+    left: 9px;
+    right: auto;
+    width: 2px;
+    height: auto;
+  }
+
+  .progress__step:first-child::before,
+  .progress__step:last-child::before {
+    left: 9px;
+    right: auto;
+  }
+
+  .progress__step:last-child::before {
+    display: none;
+  }
+}
+
+/* ===== the live indicator =============================================== */
+
+.live {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 4px 10px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  white-space: nowrap;
+}
+
+.live__dot {
+  width: 7px;
+  height: 7px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--ok);
+  animation: live-pulse 2s ease-in-out infinite;
+}
+
+.live--paused .live__dot {
+  background: var(--text-subtle);
+  animation: none;
+}
+
+@keyframes live-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.25;
+  }
+}
+
+/* Respect a system preference for less movement. */
+@media (prefers-reduced-motion: reduce) {
+  .live__dot {
+    animation: none;
+  }
+}
+
+/* ===== inline status actions (the order queue) ========================== */
+
+.status-actions__buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.status-actions__error {
+  margin: 0 0 6px;
+  max-width: 220px;
+}
+
+.status-actions__done {
+  font-size: 0.78rem;
+}
+
+/* ===== page headers that carry a live indicator ========================= */
+
+.orders__header,
+.order-detail__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--gap);
+  flex-wrap: wrap;
+}
+
+.orders__header h1,
+.order-detail__header h1 {
+  margin-bottom: 4px;
+}
+
+.order-detail__header p {
+  margin: 0;
+}
+
 /* ===== focus ============================================================ */
 /* A visible ring for the things that did not have one: links, buttons and
    the option cards. Text inputs are left alone — they already answer focus

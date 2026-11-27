@@ -1,9 +1,20 @@
-/** One order. Another user's order id returns 404 from the API. */
+/**
+ * One order. Another user's order id returns 404 from the API.
+ *
+ * Leads with where the order has got to, because that is what someone opens
+ * this page to find out — the prices and the address are reference, the
+ * progress is the news. It refreshes itself while the tab is open, so an
+ * order that ships while the page is sitting there says so.
+ */
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 
+import LiveIndicator from '../components/LiveIndicator';
+import OrderProgress from '../components/OrderProgress';
+import StatusPill from '../components/StatusPill';
 import { orderApi } from '../api/endpoints';
+import { useLiveRefresh } from '../hooks/useLiveRefresh';
 import { formatDate, formatPrice } from '../utils/format';
 
 export default function OrderDetailPage() {
@@ -12,26 +23,49 @@ export default function OrderDetailPage() {
   const [order, setOrder] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [lastSynced, setLastSynced] = useState(null);
+
+  /** `quiet` leaves what is on screen alone, for background polls. */
+  const load = useCallback(
+    ({ signal, quiet = false } = {}) => {
+      if (!quiet) {
+        setLoading(true);
+        setError(null);
+      }
+
+      return orderApi
+        .get(id, { signal })
+        .then((data) => {
+          setOrder(data);
+          setLoading(false);
+          setLastSynced(new Date());
+        })
+        .catch((err) => {
+          if (err.name === 'AbortError') return;
+          // A failed poll leaves the order already on screen in place.
+          if (quiet) return;
+          setError(
+            err.status === 404
+              ? 'That order does not exist, or it is not yours.'
+              : err.message,
+          );
+          setLoading(false);
+        });
+    },
+    [id],
+  );
 
   useEffect(() => {
-    setLoading(true);
-    setError(null);
+    const controller = new AbortController();
+    load({ signal: controller.signal });
+    return () => controller.abort();
+  }, [load]);
 
-    orderApi
-      .get(id)
-      .then((data) => {
-        setOrder(data);
-        setLoading(false);
-      })
-      .catch((err) => {
-        setError(
-          err.status === 404
-            ? 'That order does not exist, or it is not yours.'
-            : err.message,
-        );
-        setLoading(false);
-      });
-  }, [id]);
+  const refresh = useCallback(() => load({ quiet: true }), [load]);
+  // A finished order will never change again, so stop asking.
+  useLiveRefresh(refresh, {
+    enabled: Boolean(order) && !['delivered', 'cancelled'].includes(order.status),
+  });
 
   if (loading) return <p className="status">Loading order…</p>;
 
@@ -50,8 +84,31 @@ export default function OrderDetailPage() {
         ← Back to my orders
       </Link>
 
-      <h1>Order #{order.id}</h1>
-      <p className="muted">Placed {formatDate(order.created_at)}</p>
+      <header className="order-detail__header">
+        <div>
+          <h1>
+            Order #{order.id}{' '}
+            <StatusPill status={order.status} label={order.status_display} />
+          </h1>
+          <p className="muted">
+            Placed {formatDate(order.created_at)}
+            {order.status_updated_at &&
+              ` · updated ${formatDate(order.status_updated_at)}`}
+          </p>
+        </div>
+        {order.status !== 'delivered' && order.status !== 'cancelled' && (
+          <LiveIndicator at={lastSynced} />
+        )}
+      </header>
+
+      <div className="card order-detail__card">
+        <h2 className="order-detail__subhead">Progress</h2>
+        <OrderProgress
+          status={order.status}
+          statusDisplay={order.status_display}
+          cancelledAt={order.cancelled_at}
+        />
+      </div>
 
       <div className="card order-detail__card">
         <dl className="order-detail__list">

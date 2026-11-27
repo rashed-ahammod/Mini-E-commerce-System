@@ -1,10 +1,23 @@
-/** The logged-in user's order history, paginated. */
+/**
+ * The logged-in user's order history, paginated.
+ *
+ * Shows where each order has got to. The shop has always recorded a status —
+ * the organization moves orders through confirmed, packed, shipped — but
+ * until now it was never shown to the person waiting for the parcel, which
+ * made the whole lifecycle invisible from this side.
+ *
+ * The page refreshes itself while the tab is open, so an order confirmed by
+ * staff a moment ago says so without anyone reloading.
+ */
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 
+import LiveIndicator from '../components/LiveIndicator';
 import Pagination from '../components/Pagination';
+import StatusPill from '../components/StatusPill';
 import { orderApi } from '../api/endpoints';
+import { useLiveRefresh } from '../hooks/useLiveRefresh';
 import { formatDate, formatPrice } from '../utils/format';
 
 const PAGE_SIZE = 10;
@@ -19,27 +32,50 @@ export default function OrdersPage() {
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [lastSynced, setLastSynced] = useState(null);
+
+  /** `quiet` leaves the rows and the spinner alone, for background polls. */
+  const load = useCallback(
+    ({ signal, quiet = false } = {}) => {
+      if (!quiet) {
+        setLoading(true);
+        setError(null);
+      }
+
+      return orderApi
+        .list({ page, page_size: PAGE_SIZE }, { signal })
+        .then((data) => {
+          setOrders(data.results);
+          setCount(data.count);
+          setLoading(false);
+          setLastSynced(new Date());
+        })
+        .catch((err) => {
+          if (err.name === 'AbortError') return;
+          // A failed background poll leaves the last good rows on screen.
+          if (quiet) return;
+          setError(err.message);
+          setLoading(false);
+        });
+    },
+    [page],
+  );
 
   useEffect(() => {
-    setLoading(true);
-    setError(null);
+    const controller = new AbortController();
+    load({ signal: controller.signal });
+    return () => controller.abort();
+  }, [load]);
 
-    orderApi
-      .list({ page, page_size: PAGE_SIZE })
-      .then((data) => {
-        setOrders(data.results);
-        setCount(data.count);
-        setLoading(false);
-      })
-      .catch((err) => {
-        setError(err.message);
-        setLoading(false);
-      });
-  }, [page]);
+  const refresh = useCallback(() => load({ quiet: true }), [load]);
+  useLiveRefresh(refresh);
 
   return (
     <div className="orders">
-      <h1>My orders</h1>
+      <header className="orders__header">
+        <h1>My orders</h1>
+        {orders.length > 0 && <LiveIndicator at={lastSynced} />}
+      </header>
 
       {justOrdered > 0 && (
         <p className="alert alert--success">
@@ -63,6 +99,7 @@ export default function OrdersPage() {
               <th>Product</th>
               <th>Qty</th>
               <th>Total</th>
+              <th>Status</th>
               <th>Placed</th>
               <th />
             </tr>
@@ -83,6 +120,12 @@ export default function OrdersPage() {
                 </td>
                 <td>{order.quantity}</td>
                 <td>{formatPrice(order.total_price)}</td>
+                <td>
+                  <StatusPill
+                    status={order.status}
+                    label={order.status_display}
+                  />
+                </td>
                 <td className="muted">{formatDate(order.created_at)}</td>
                 <td>
                   <Link to={`/orders/${order.id}`}>Details</Link>

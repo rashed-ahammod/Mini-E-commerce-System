@@ -14,7 +14,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 
-import StatusPill from '../components/StatusPill';
+import StatusPill from '../../components/StatusPill';
 import { orgApi } from '../../api/endpoints';
 import { formatDate, formatPrice } from '../../utils/format';
 

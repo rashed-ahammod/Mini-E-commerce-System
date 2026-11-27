@@ -15,7 +15,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 
 import Modal from '../components/Modal';
-import StatusPill from '../components/StatusPill';
+import StatusPill from '../../components/StatusPill';
 import { orgApi } from '../../api/endpoints';
 import { formatDate, formatPrice } from '../../utils/format';
 

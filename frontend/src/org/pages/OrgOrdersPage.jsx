@@ -8,15 +8,27 @@
  *
  * Filters live in the URL so a view — "pending orders over $500 this week" —
  * can be bookmarked, shared with a colleague, and survives the back button.
+ *
+ * Orders are moved along from the rows themselves. This is the page staff
+ * work from: a queue to be confirmed, packed and shipped. Opening each order
+ * to act and then coming back would turn a morning's work into hundreds of
+ * round trips, so <StatusActions> puts the same actions on the row.
+ *
+ * The list also refreshes itself while the tab is open, because several
+ * people work this queue at once and a row someone else has already dealt
+ * with should not sit here looking like it still needs doing.
  */
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 
 import Pagination from '../../components/Pagination';
-import StatusPill from '../components/StatusPill';
+import StatusPill from '../../components/StatusPill';
+import LiveIndicator from '../../components/LiveIndicator';
+import StatusActions from '../components/StatusActions';
 import { orgApi } from '../../api/endpoints';
 import { useDebouncedValue } from '../../hooks/useDebouncedValue';
+import { useLiveRefresh } from '../../hooks/useLiveRefresh';
 import { formatDate, formatPrice } from '../../utils/format';
 
 const PAGE_SIZE = 20;
@@ -53,6 +65,7 @@ export default function OrgOrdersPage() {
   const [count, setCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [lastSynced, setLastSynced] = useState(null);
 
   const update = useCallback(
     (changes) => {
@@ -89,45 +102,85 @@ export default function OrgOrdersPage() {
       .catch(() => setWorkflow([])); // tabs degrade to "All" and "Open"
   }, []);
 
+  /**
+   * Load the current page of the queue.
+   *
+   * `quiet` is what makes the background refresh tolerable: it leaves the
+   * spinner and the existing rows alone, so a poll landing mid-scroll does
+   * not blank the table someone is reading.
+   */
+  const load = useCallback(
+    ({ signal, quiet = false } = {}) => {
+      if (!quiet) {
+        setLoading(true);
+        setError(null);
+      }
+
+      return orgApi.orders
+        .list(
+          {
+            status: filters.status,
+            open: filters.open,
+            search: filters.search,
+            customer_username: filters.customer,
+            placed_after: filters.placedAfter,
+            min_total: filters.minTotal,
+            ordering: filters.ordering,
+            page: filters.page,
+            page_size: PAGE_SIZE,
+          },
+          { signal },
+        )
+        .then((data) => {
+          setOrders(data.results);
+          setCount(data.count);
+          setLoading(false);
+          setLastSynced(new Date());
+        })
+        .catch((err) => {
+          if (err.name === 'AbortError') return;
+          // A background poll that fails is not worth a message: the rows on
+          // screen are still the last good ones, and the next tick retries.
+          if (quiet) return;
+          // Narrowing the filters while on a later page asks for a page that
+          // no longer exists; fall back rather than showing an error.
+          if (err.status === 404 && filters.page > 1) {
+            update({ page: 1 });
+            return;
+          }
+          setError(err.message);
+          setLoading(false);
+        });
+    },
+    [filters, update],
+  );
+
   useEffect(() => {
     const controller = new AbortController();
-    setLoading(true);
-    setError(null);
-
-    orgApi.orders
-      .list(
-        {
-          status: filters.status,
-          open: filters.open,
-          search: filters.search,
-          customer_username: filters.customer,
-          placed_after: filters.placedAfter,
-          min_total: filters.minTotal,
-          ordering: filters.ordering,
-          page: filters.page,
-          page_size: PAGE_SIZE,
-        },
-        { signal: controller.signal },
-      )
-      .then((data) => {
-        setOrders(data.results);
-        setCount(data.count);
-        setLoading(false);
-      })
-      .catch((err) => {
-        if (err.name === 'AbortError') return;
-        // Narrowing the filters while on a later page asks for a page that
-        // no longer exists; fall back rather than showing an error.
-        if (err.status === 404 && filters.page > 1) {
-          update({ page: 1 });
-          return;
-        }
-        setError(err.message);
-        setLoading(false);
-      });
-
+    load({ signal: controller.signal });
     return () => controller.abort();
-  }, [filters, update]);
+  }, [load]);
+
+  const refresh = useCallback(() => load({ quiet: true }), [load]);
+  useLiveRefresh(refresh);
+
+  /**
+   * A row's status changed.
+   *
+   * The response is the whole updated order, so it goes straight into the
+   * row — the staff member sees what they just did, immediately. A quiet
+   * reload follows because the order may no longer belong in this view at
+   * all: confirm something while filtered to "pending" and it has to leave.
+   */
+  const handleChanged = useCallback(
+    (updated) => {
+      setOrders((current) =>
+        current.map((order) => (order.id === updated.id ? updated : order)),
+      );
+      refresh();
+    },
+    [refresh],
+  );
 
   const clear = () => {
     setSearchInput('');
@@ -159,6 +212,7 @@ export default function OrgOrdersPage() {
           <h1>Orders</h1>
           <p className="muted">Every customer's orders, newest first.</p>
         </div>
+        <LiveIndicator at={lastSynced} />
       </header>
 
       {/* ---- status tabs, built from the server's workflow ---- */}
@@ -289,6 +343,7 @@ export default function OrgOrdersPage() {
                 <th>Total</th>
                 <th>Status</th>
                 <th>Placed</th>
+                <th>Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -312,6 +367,13 @@ export default function OrgOrdersPage() {
                     <StatusPill status={order.status} label={order.status_display} />
                   </td>
                   <td className="muted">{formatDate(order.created_at)}</td>
+                  <td>
+                    <StatusActions
+                      order={order}
+                      onChanged={handleChanged}
+                      compact
+                    />
+                  </td>
                 </tr>
               ))}
             </tbody>

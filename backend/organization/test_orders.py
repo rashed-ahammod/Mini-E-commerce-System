@@ -509,3 +509,71 @@ class OrgSeesDeliveryDetailsTests(OrgOrderTestCase):
             f"{short_page} queries for 2 orders but {long_page} for 10: "
             "something is being fetched once per row.",
         )
+
+
+class QueueOffersTheRightActionsTests(OrgOrderTestCase):
+    """The order list carries each order's allowed transitions.
+
+    Staff move orders along from the queue, so the rows need to know what
+    the server will accept. The point of sending it rather than hard-coding
+    it in the frontend is that the two can never disagree: these tests pin
+    the list's answer to the model's own rules.
+    """
+
+    def setUp(self):
+        super().setUp()
+        self.client.credentials(HTTP_AUTHORIZATION=f"Token {self.staff_token.key}")
+
+    def rows(self):
+        response = self.client.get(reverse("org-order-list"), {"page_size": 50})
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        return {row["id"]: row for row in response.data["results"]}
+
+    def test_a_pending_order_offers_confirm_and_cancel(self):
+        row = self.rows()[self.cara_order.id]
+
+        self.assertEqual(sorted(row["next_statuses"]), ["cancelled", "confirmed"])
+        self.assertTrue(row["is_open"])
+
+    def test_the_list_matches_the_model_for_every_status(self):
+        """Whatever the rules say, the queue says the same."""
+        for order_status in OrderStatus:
+            with self.subTest(status=order_status):
+                order = self.place(self.cara, self.product, 1)
+                Order.objects.filter(pk=order.pk).update(status=order_status)
+                order.refresh_from_db()
+
+                row = self.rows()[order.id]
+
+                self.assertEqual(row["next_statuses"], order.next_statuses)
+                self.assertEqual(row["is_open"], order.is_open)
+
+    def test_a_finished_order_offers_nothing(self):
+        order = self.place(self.cara, self.product, 1)
+        Order.objects.filter(pk=order.pk).update(status=OrderStatus.DELIVERED)
+
+        row = self.rows()[order.id]
+
+        self.assertEqual(row["next_statuses"], [])
+        self.assertFalse(row["is_open"])
+
+    def test_acting_on_a_row_uses_the_same_rules_as_the_detail_page(self):
+        """An action offered by the queue is one the server accepts."""
+        row = self.rows()[self.cara_order.id]
+        offered = [s for s in row["next_statuses"] if s != "cancelled"][0]
+
+        response = self.client.post(
+            reverse("org-order-status", args=[self.cara_order.id]),
+            {"status": offered},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["status"], offered)
+
+    def test_a_customer_still_cannot_read_the_queue(self):
+        self.client.credentials(HTTP_AUTHORIZATION=f"Token {self.cara_token.key}")
+
+        response = self.client.get(reverse("org-order-list"))
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)

@@ -66,11 +66,25 @@ class OrderStatusEventSerializer(serializers.ModelSerializer):
 
 
 class OrgOrderListSerializer(serializers.ModelSerializer):
-    """An order as it appears in the organization's order list."""
+    """An order as it appears in the organization's order list.
+
+    `next_statuses` is here, not only on the detail serializer, so the queue
+    can offer each order's actions inline. Both come from the model's own
+    transition rules, so the buttons are exactly the ones the server will
+    accept — the UI never holds a second copy of the workflow that could
+    drift from the first.
+
+    It costs nothing: both are dictionary lookups on a field already loaded,
+    not queries.
+    """
 
     customer = OrderCustomerSerializer(source="user", read_only=True)
     product = ProductBriefSerializer(read_only=True)
     status_display = serializers.CharField(source="get_status_display", read_only=True)
+    next_statuses = serializers.ListField(
+        child=serializers.CharField(), read_only=True
+    )
+    is_open = serializers.BooleanField(read_only=True)
 
     class Meta:
         model = Order
@@ -87,30 +101,27 @@ class OrgOrderListSerializer(serializers.ModelSerializer):
             "status_display",
             "status_updated_at",
             "created_at",
+            "is_open",
+            "next_statuses",
         ]
         read_only_fields = fields
 
 
 class OrgOrderDetailSerializer(OrgOrderListSerializer):
-    """One order in full, including its history and what it may become next.
+    """One order in full, including its history.
 
-    `next_statuses` means the UI never has to hold its own copy of the
-    transition rules: it offers exactly the buttons the server will accept.
+    Everything the list carries, plus the timeline and the cancellation
+    details. `next_statuses` is inherited from the list serializer, where the
+    queue needs it too.
     """
 
     events = OrderStatusEventSerializer(many=True, read_only=True)
-    next_statuses = serializers.ListField(
-        child=serializers.CharField(), read_only=True
-    )
-    is_open = serializers.BooleanField(read_only=True)
 
     class Meta(OrgOrderListSerializer.Meta):
         fields = OrgOrderListSerializer.Meta.fields + [
             "cancelled_at",
             "cancellation_reason",
             "stock_restored",
-            "is_open",
-            "next_statuses",
             "events",
         ]
         read_only_fields = fields
