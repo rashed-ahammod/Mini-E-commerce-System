@@ -2,7 +2,7 @@
 
     python manage.py seed_data
     python manage.py seed_data --flush        # delete existing data first
-    python manage.py seed_data --demo-user    # also create the demo account
+    python manage.py seed_data --demo-user    # also create the demo accounts
 
 The catalog itself lives in `catalog_data.json` next to this file: 6
 categories and 49 products with real names, descriptions, prices and
@@ -25,7 +25,7 @@ from django.contrib.auth import get_user_model
 from django.core.management.base import BaseCommand
 from django.db import transaction
 
-from accounts.models import profile_for
+from accounts.models import Role, profile_for
 from catalog.models import Category, Product
 from orders.models import Order
 
@@ -41,6 +41,19 @@ DEMO_PASSWORD = "demo12345"
 DEMO_EMAIL = "demo@example.com"
 DEMO_PHONE = "+880 1711 123456"
 DEMO_ADDRESS = "House 12, Road 5\nDhanmondi, Dhaka 1205"
+
+# A second published account, this one on the organization side, so that
+# anyone reviewing the project can open the operations console and see the
+# half of the system a customer never meets. Staff rather than admin: it
+# reaches the dashboard, the order queue and the catalog, but not the
+# management of other people's accounts.
+#
+# These credentials are printed on the login page. That is deliberate for a
+# demo, and it is the reason the role stops at `staff`.
+STAFF_USERNAME = "salesman"
+STAFF_PASSWORD = "@111111@"
+STAFF_EMAIL = "salesman@example.com"
+STAFF_DEPARTMENT = "Sales"
 
 
 class Command(BaseCommand):
@@ -124,3 +137,40 @@ class Command(BaseCommand):
                     f"Demo user {action}: {DEMO_USERNAME} / {DEMO_PASSWORD}"
                 )
             )
+
+            self._demo_staff()
+
+    def _demo_staff(self):
+        """The published organization account behind the login page's box.
+
+        Re-running this resets the password, exactly as the demo customer's
+        is reset, so the credentials on the login page are always the ones
+        that work. The role is forced back to staff too: a demo account that
+        someone quietly promoted would hand the next visitor more than the
+        page claims to give away.
+        """
+        user, was_created = User.objects.get_or_create(
+            username=STAFF_USERNAME,
+            defaults={"email": STAFF_EMAIL},
+        )
+        user.set_password(STAFF_PASSWORD)
+        if not user.email:
+            user.email = STAFF_EMAIL
+        user.save()
+
+        profile = profile_for(user)
+        profile.role = Role.STAFF
+        profile.department = STAFF_DEPARTMENT
+        if not profile.phone.strip():
+            profile.phone = DEMO_PHONE
+        if not profile.address.strip():
+            profile.address = DEMO_ADDRESS
+        profile.save()
+
+        action = "created" if was_created else "password reset"
+        self.stdout.write(
+            self.style.SUCCESS(
+                f"Demo organization user {action}: "
+                f"{STAFF_USERNAME} / {STAFF_PASSWORD} (role: staff)"
+            )
+        )

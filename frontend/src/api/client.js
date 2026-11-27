@@ -12,6 +12,26 @@ const BASE_URL = (
 
 const TOKEN_STORAGE_KEY = 'mini-ecommerce-token';
 
+/**
+ * Is the API the one hosted on Render's free tier?
+ *
+ * Free Render services spin down after about 15 minutes of inactivity, and
+ * the request that wakes one up can take the best part of a minute. That is
+ * worth explaining to someone staring at a spinner — but only when it is
+ * actually the explanation. Against a local backend, or anywhere else, a
+ * slow request means something else entirely, and the app should stay quiet
+ * rather than blame a host that is not involved.
+ */
+export const isRenderApi = (() => {
+  try {
+    // BASE_URL may be relative in some setups, hence the second argument.
+    const { hostname } = new URL(BASE_URL, window.location.origin);
+    return hostname === 'onrender.com' || hostname.endsWith('.onrender.com');
+  } catch {
+    return false;
+  }
+})();
+
 // ---------------------------------------------------------------------------
 // Token storage
 // ---------------------------------------------------------------------------

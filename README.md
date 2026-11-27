@@ -35,12 +35,20 @@ accounts. Customers never see any of it; see
 | **API** | <https://mini-ecommerce-api-alnq.onrender.com/api/> |
 | **Admin** | <https://mini-ecommerce-api-alnq.onrender.com/admin/> |
 
-Sign in to the shop with the sample account:
+Sign in with either sample account — both are printed on the login page
+itself, with a button that fills the form, so there is nothing to copy:
 
-```
-username: demo
-password: demo12345
-```
+| | Username | Password | What it opens |
+| --- | --- | --- | --- |
+| **Customer** | `demo` | `demo12345` | The shop: browse, order, order history |
+| **Organization staff** | `salesman` | `@111111@` | The shop *and* the console at `/org` |
+
+The second one is there so the operations console can actually be looked at —
+it is half the project, and a customer account cannot reach any of it. It is
+deliberately `staff` rather than `admin`: it runs the dashboard, the order
+queue and the catalog, but cannot create or manage other accounts. Both are
+created and have their passwords reset by `seed_data --demo-user`, so what the
+login page prints is always what works.
 
 > **The first request takes about 50 seconds.** The API runs on Render's free
 > tier, which spins the service down after ~15 minutes of inactivity. The
@@ -97,13 +105,13 @@ python -m venv .venv
 pip install -r requirements.txt
 copy .env.example .env              # cp on macOS/Linux
 python manage.py migrate
-python manage.py seed_data --demo-user   # 49 products + demo account
+python manage.py seed_data --demo-user   # 49 products + both demo accounts
 python manage.py runserver
 ```
 
 - API: <http://127.0.0.1:8000/api/>
 - Admin: <http://127.0.0.1:8000/admin/> (run `python manage.py createsuperuser` first)
-- Demo login: **demo / demo12345**
+- Demo logins: **demo / demo12345** (customer), **salesman / @111111@** (staff)
 
 ### 2. Frontend
 

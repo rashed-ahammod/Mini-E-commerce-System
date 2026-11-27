@@ -133,6 +133,17 @@ are not writing to the production database by accident.
 5. Set `SEED_DATA` to `true` for this first deploy if you want the sample
    catalog, then back to `false` afterwards.
 
+> `SEED_DATA=true` also creates the two accounts the login page publishes —
+> `demo` (customer) and `salesman` (organization staff). Without it those
+> credentials are printed on the login page but do not exist, and anyone
+> trying them gets "Invalid username or password". If you deployed before
+> and want them now, set `SEED_DATA=true` for one more deploy: the seed is
+> idempotent and updates the sample catalog rather than duplicating it.
+>
+> If you would rather not publish a staff login at all, remove the
+> `SAMPLE_LOGINS` entry in `frontend/src/pages/LoginPage.jsx` — it is the
+> only thing that puts those credentials on screen.
+
 ### Option B — by hand
 
 Render dashboard → **New → Web Service**, then:
