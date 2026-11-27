@@ -819,3 +819,30 @@
     flex-wrap: wrap;
   }
 }
+
+/* ===== customers and accounts =========================================== */
+
+.table__sub {
+  font-size: 0.78rem;
+  margin-top: 1px;
+}
+
+.table__you {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+/* Dates and "Never" are long; the stat tiles would otherwise set them in
+   the same size as a currency figure. */
+.stat__value--small {
+  font-size: 1.05rem;
+  letter-spacing: 0;
+}

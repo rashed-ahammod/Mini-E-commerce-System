@@ -42,6 +42,11 @@ frontend/src/
 ├── cart/                CartProvider, the context object, the useCart hook
 ├── components/          Layout, NavBar, ProtectedRoute, CatalogSidebar,
 │                         Pagination, ProductCard, ProductCardSkeleton
+├── org/                 the organization console (see below)
+│   ├── OrganizationRoute.jsx
+│   ├── components/      OrgLayout, Modal, StatusPill, CatalogTabs,
+│   │                    ProductFormModal, StockAdjustModal
+│   └── pages/           dashboard, orders, catalog, customers, accounts
 ├── hooks/               useDebouncedValue
 ├── pages/               one file per screen
 ├── utils/format.js      price and date formatting
@@ -73,6 +78,7 @@ frontend/src/
 | `/orders` | Order history | yes |
 | `/orders/:id` | One order | yes |
 | `/login`, `/register` | Authentication | no |
+| `/org/*` | The organization console — see below | organization account |
 
 ### The catalog page
 
@@ -106,6 +112,68 @@ Details worth knowing while debugging:
 - a product's picture comes from the API as a single `image` field. Cards
   fall back to a letter tile both when it is missing **and** when the image
   fails to load, so one dead link never leaves a hole in the grid.
+
+### The organization console
+
+A second area of the app at `/org`, for the people who **run** the shop
+rather than shop in it. It is the same React application and the same token
+— only the role differs.
+
+| Route | Page | Needs |
+| --- | --- | --- |
+| `/org` | Dashboard: revenue, orders, best sellers, what needs attention | staff |
+| `/org/orders` | The queue, filtered by status, customer, date, total | staff |
+| `/org/orders/:id` | One order: history, and the actions that move it | staff |
+| `/org/products` | Catalog: edit, restock, delete | staff |
+| `/org/categories` | Categories | staff |
+| `/org/customers` | Customers with spend and order counts | staff |
+| `/org/customers/:id` | One customer, their orders, deactivation | staff |
+| `/org/staff` | Organization accounts | **admin** |
+
+Access is decided in one place,
+[`OrganizationRoute.jsx`](src/org/OrganizationRoute.jsx), from the `role`
+and `is_organization` that arrive with every login. A **customer** who
+reaches one of these URLs is sent to the shop, not to the login page —
+they are signed in perfectly well, just not as someone who runs the shop,
+and asking them to log in again would be misleading. Anonymous visitors do
+get the login page.
+
+The console is styled to look unlike the shop — dark rail, own navigation,
+a visible "Operations console" label. Someone who can both shop and run the
+shop should never be in doubt about which one they are looking at; that is
+what stops a test order being cancelled for real.
+
+#### The rules live on the server
+
+Two places where it would have been easy, and wrong, to keep a copy:
+
+- **Order statuses.** The status tabs come from
+  `GET /org/orders/statuses/`, and the buttons on an order come from that
+  order's own `next_statuses`. Nothing in the frontend knows that
+  *confirmed* follows *pending*. Add a status on the backend and the console
+  offers it with no change here; a hard-coded copy would have drifted the
+  first time the rules moved.
+- **Lockout guards.** The server refuses to let an admin change their own
+  role or deactivate their own account. The accounts page does not
+  re-implement that — it simply does not draw those buttons on your own row,
+  and says why. The server is still what enforces it.
+
+#### Actions that need a reason
+
+Cancelling an order, deactivating a customer and revoking a colleague's
+access all open a dialog rather than firing from a button, and the confirm
+stays disabled until the reason is typed, because the API requires one.
+Each dialog states what will actually happen — how many units return to
+which product, that a customer's orders are untouched, that the person is
+signed out immediately.
+
+#### Stock
+
+The product edit form shows stock **read-only**. Writing it back from a form
+would undo any sale made while the form was open. The adjust dialog offers
+*Received* and *Removed*, which send a delta the server applies under a row
+lock, and *Stocktake*, which sends an absolute count and carries a warning
+that it overwrites.
 
 ### The cart
 

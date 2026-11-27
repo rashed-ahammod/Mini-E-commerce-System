@@ -18,8 +18,11 @@ import OrganizationRoute from './org/OrganizationRoute';
 import OrgDashboardPage from './org/pages/OrgDashboardPage';
 import OrgOrderDetailPage from './org/pages/OrgOrderDetailPage';
 import OrgCategoriesPage from './org/pages/OrgCategoriesPage';
+import OrgCustomerDetailPage from './org/pages/OrgCustomerDetailPage';
+import OrgCustomersPage from './org/pages/OrgCustomersPage';
 import OrgOrdersPage from './org/pages/OrgOrdersPage';
 import OrgProductsPage from './org/pages/OrgProductsPage';
+import OrgStaffPage from './org/pages/OrgStaffPage';
 import CartPage from './pages/CartPage';
 import LoginPage from './pages/LoginPage';
 import NotFoundPage from './pages/NotFoundPage';
@@ -76,6 +79,19 @@ export default function App() {
         <Route path="orders/:id" element={<OrgOrderDetailPage />} />
         <Route path="products" element={<OrgProductsPage />} />
         <Route path="categories" element={<OrgCategoriesPage />} />
+        <Route path="customers" element={<OrgCustomersPage />} />
+        <Route path="customers/:id" element={<OrgCustomerDetailPage />} />
+
+        {/* Managing colleagues is an admin job; staff are sent back to
+            the dashboard rather than shown a page of 403s. */}
+        <Route
+          path="staff"
+          element={
+            <OrganizationRoute adminOnly>
+              <OrgStaffPage />
+            </OrganizationRoute>
+          }
+        />
       </Route>
     </Routes>
   );

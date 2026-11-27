@@ -8,10 +8,11 @@ pagination, token authentication and orders. The frontend is a small shop:
 browse and filter a catalog of 49 real products, add things to a cart, log
 in, place orders and look at your order history.
 
-It also has a **second side**: organization accounts that run the shop —
-working through every customer's orders, managing the catalog and stock,
-reading a dashboard, and administering accounts. Customers never see any of
-it; see [the organization API](#the-organization-side).
+It also has a **second side**: an operations console at `/org` for the
+accounts that run the shop — working through every customer's orders,
+managing the catalog and stock, reading a dashboard, and administering
+accounts. Customers never see any of it; see
+[the organization side](#the-organization-side).
 
 ```
 ┌─────────────────────────┐        HTTP + token auth        ┌──────────────────────────┐
@@ -185,10 +186,10 @@ Everything the assignment asks for, plus two of the optional extras.
 | **Optional:** stock validation | `orders/serializers.py` |
 | **Optional:** product image | `Product.image` (upload) and `Product.image_url` (hosted elsewhere) |
 
-Beyond the brief: an entire organization side (roles, order lifecycle,
-dashboard, customer and account management), 246 automated tests, a seeded
-catalog of 49 real products, a React frontend, and deployment
-configuration.
+Beyond the brief: an entire organization side — roles, an order lifecycle,
+a dashboard, customer and account management, and an operations console in
+the frontend — plus 246 automated tests, a seeded catalog of 49 real
+products and deployment configuration.
 
 ## API at a glance
 
@@ -245,6 +246,21 @@ interface to show without a second request.
 | Dashboard, customer management | — | ✅ | ✅ |
 | Create and manage organization accounts | — | — | ✅ |
 
+The console lives at **`/org`** in the same React app — same login, same
+token, different role. It is styled deliberately unlike the shop, so
+someone who can do both is never in doubt which they are looking at.
+
+| Screen | What it is for |
+| --- | --- |
+| `/org` | Revenue, order counts, best sellers, what needs attention today |
+| `/org/orders` | The queue: filter by status, customer, date or value |
+| `/org/orders/:id` | Move an order along, cancel it, read its history |
+| `/org/products` · `/org/categories` | Edit the catalog, restock, add products |
+| `/org/customers` | Who buys, what they have spent, suspend an account |
+| `/org/staff` | Add colleagues and set their role (**admin only**) |
+
+Behind it:
+
 ```
 POST /api/org/orders/{id}/status/      advance an order
 POST /api/org/orders/{id}/cancel/      cancel it, returning the stock
@@ -267,6 +283,12 @@ behave the same, every transition is recorded with who did it and why, and
 cancelling returns the stock exactly once. A shipped order cannot be
 cancelled — that needs a returns process.
 
+The console never keeps its own copy of the server's rules. The status tabs
+and the buttons on an order come from the API's own transition map, so
+adding a status on the backend needs no frontend change. The accounts page
+does not re-implement the self-lockout guards either — it just does not
+offer the buttons the server would refuse.
+
 The first organization admin is created from the command line, because an
 API that needs an admin in order to create an admin cannot bootstrap itself:
 
@@ -274,7 +296,8 @@ API that needs an admin in order to create an admin cannot bootstrap itself:
 python manage.py create_org_user alice --role admin
 ```
 
-Full endpoint tables are in [backend/README.md](backend/README.md).
+Full endpoint tables are in [backend/README.md](backend/README.md); the
+console's structure is in [frontend/README.md](frontend/README.md).
 
 ## Testing with Postman
 
