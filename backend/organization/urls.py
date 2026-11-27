@@ -9,12 +9,18 @@ config.views.api_root and leave GET /api/ listing only these routes.
 from django.urls import include, path
 from rest_framework.routers import DefaultRouter
 
-from .views import DashboardView, OrgCustomerViewSet, OrgOrderViewSet
+from .views import (
+    DashboardView,
+    OrgCustomerViewSet,
+    OrgOrderViewSet,
+    OrgStaffViewSet,
+)
 
 router = DefaultRouter()
 router.root_view_name = "org-root"
 router.register("orders", OrgOrderViewSet, basename="org-order")
 router.register("customers", OrgCustomerViewSet, basename="org-customer")
+router.register("staff", OrgStaffViewSet, basename="org-staff")
 
 urlpatterns = [
     path("dashboard/", DashboardView.as_view(), name="org-dashboard"),

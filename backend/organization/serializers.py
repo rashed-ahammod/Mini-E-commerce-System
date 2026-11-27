@@ -8,7 +8,10 @@ careless `fields` edit could leak a customer's details into the shop.
 """
 
 from django.contrib.auth import get_user_model
+from django.contrib.auth.password_validation import validate_password
 from rest_framework import serializers
+
+from accounts.models import Role, profile_for
 
 from catalog.serializers import ProductBriefSerializer
 from orders.models import ALLOWED_TRANSITIONS, Order, OrderStatus, OrderStatusEvent
@@ -226,3 +229,100 @@ class CustomerStatusSerializer(serializers.Serializer):
     """
 
     reason = serializers.CharField(max_length=300)
+
+
+# ---------------------------------------------------------------------------
+# Organization accounts
+# ---------------------------------------------------------------------------
+
+
+class OrgStaffSerializer(serializers.ModelSerializer):
+    """An organization account as an admin sees it. Never carries a password."""
+
+    role = serializers.CharField(source="profile.role", read_only=True)
+    role_display = serializers.SerializerMethodField()
+    department = serializers.CharField(source="profile.department", read_only=True)
+    phone = serializers.CharField(source="profile.phone", read_only=True)
+
+    class Meta:
+        model = User
+        fields = [
+            "id",
+            "username",
+            "email",
+            "role",
+            "role_display",
+            "department",
+            "phone",
+            "is_active",
+            "date_joined",
+            "last_login",
+        ]
+        read_only_fields = fields
+
+    def get_role_display(self, user) -> str:
+        profile = profile_for(user)
+        return profile.get_role_display() if profile else ""
+
+
+class OrgStaffCreateSerializer(serializers.Serializer):
+    """Create an organization account.
+
+    Only `staff` and `admin` can be granted here: this endpoint exists to
+    add colleagues, and creating a customer is what public registration is
+    for. `is_superuser` is deliberately absent — Django admin access is a
+    server-level decision, not something an API caller hands out.
+    """
+
+    username = serializers.CharField(max_length=150)
+    email = serializers.EmailField(required=False, allow_blank=True)
+    password = serializers.CharField(write_only=True, validators=[validate_password])
+    role = serializers.ChoiceField(choices=[Role.STAFF, Role.ADMIN])
+    department = serializers.CharField(required=False, allow_blank=True, max_length=100)
+    phone = serializers.CharField(required=False, allow_blank=True, max_length=30)
+
+    def validate_username(self, value):
+        if User.objects.filter(username__iexact=value).exists():
+            raise serializers.ValidationError("That username is already taken.")
+        return value
+
+    def create(self, validated_data):
+        user = User.objects.create_user(
+            username=validated_data["username"],
+            email=validated_data.get("email", ""),
+            password=validated_data["password"],
+        )
+        profile = profile_for(user)
+        profile.role = validated_data["role"]
+        profile.department = validated_data.get("department", "")
+        profile.phone = validated_data.get("phone", "")
+        profile.save()
+        return user
+
+
+class OrgStaffUpdateSerializer(serializers.Serializer):
+    """Change a colleague's role or contact details.
+
+    Not the password: an admin resetting someone's password by hand is how
+    shared credentials start. The role may be set to `customer`, which
+    revokes organization access while leaving the person able to shop.
+    """
+
+    email = serializers.EmailField(required=False, allow_blank=True)
+    role = serializers.ChoiceField(
+        choices=[Role.CUSTOMER, Role.STAFF, Role.ADMIN], required=False
+    )
+    department = serializers.CharField(required=False, allow_blank=True, max_length=100)
+    phone = serializers.CharField(required=False, allow_blank=True, max_length=30)
+
+    def update(self, instance, validated_data):
+        if "email" in validated_data:
+            instance.email = validated_data["email"]
+            instance.save(update_fields=["email"])
+
+        profile = profile_for(instance)
+        for field in ("role", "department", "phone"):
+            if field in validated_data:
+                setattr(profile, field, validated_data[field])
+        profile.save()
+        return instance

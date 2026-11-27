@@ -1,11 +1,14 @@
 {
   "info": {
     "name": "Mini E-commerce REST API",
-    "description": "Every endpoint of the Mini E-commerce API.\n\nSetup\n1. Start the backend: `python manage.py runserver`\n2. Load sample data: `python manage.py seed_data --demo-user`\n3. Import this collection and Mini-Ecommerce.postman_environment.json, then select the \"Mini E-commerce - Local\" environment (top right).\n4. Run \"Auth / Login\" once. A test script stores the token in the `token` environment variable, so every protected request below works without copying anything by hand.\n\nNo request has a hardcoded id. Test scripts save ids into environment variables:\n- `category_id` / `product_id`: the first item returned by the list endpoints\n- `new_category_id` / `new_product_id`: objects this collection creates, which are the only ones the delete requests touch\n- `order_id`: the order created by \"Orders / Create order\"\n\nBecause of that the whole collection can be executed top to bottom with the Collection Runner. \"Auth / Logout\" is deliberately last, since it invalidates the token.",
+    "description": "Every endpoint of the Mini E-commerce API.\n\nThis API has two kinds of account. A CUSTOMER shops; an ORGANIZATION user runs the shop. The collection logs in as both: {{token}} is the customer, {{org_token}} is the organization account. Requests that change the catalog, and everything under Organization, use {{org_token}}.\n\nSetup\n1. Start the backend: `python manage.py runserver`\n2. Load sample data: `python manage.py seed_data --demo-user`\n3. Import this collection and Mini-Ecommerce.postman_environment.json, then select the \"Mini E-commerce - Local\" environment (top right).\n4. Run \"Auth / Login\" once. A test script stores the token in the `token` environment variable, so every protected request below works without copying anything by hand.\n\nNo request has a hardcoded id. Test scripts save ids into environment variables:\n- `category_id` / `product_id`: the first item returned by the list endpoints\n- `new_category_id` / `new_product_id`: objects this collection creates, which are the only ones the delete requests touch\n- `order_id`: the order created by \"Orders / Create order\"\n\nBecause of that the whole collection can be executed top to bottom with the Collection Runner. \"Auth / Logout\" is deliberately last, since it invalidates the token.\n\nOrganization setup: create the staff account once with\n    python manage.py create_org_user opsadmin --role admin\nthen run \"Auth / Login (organization)\".",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
-    { "key": "base_url", "value": "http://127.0.0.1:8000/api" }
+    {
+      "key": "base_url",
+      "value": "http://127.0.0.1:8000/api"
+    }
   ],
   "item": [
     {
@@ -13,7 +16,15 @@
       "request": {
         "method": "GET",
         "header": [],
-        "url": { "raw": "{{base_url}}/", "host": ["{{base_url}}"], "path": [""] },
+        "url": {
+          "raw": "{{base_url}}/",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            ""
+          ]
+        },
         "description": "Index of every endpoint. A good first request to confirm the server is up."
       }
     },
@@ -41,8 +52,23 @@
           ],
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "url": { "raw": "{{base_url}}/auth/register/", "host": ["{{base_url}}"], "path": ["auth", "register", ""] },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/auth/register/",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "auth",
+                "register",
+                ""
+              ]
+            },
             "body": {
               "mode": "raw",
               "raw": "{\n  \"username\": \"testuser\",\n  \"email\": \"testuser@example.com\",\n  \"password\": \"StrongPass!234\"\n}"
@@ -67,8 +93,23 @@
           ],
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "url": { "raw": "{{base_url}}/auth/login/", "host": ["{{base_url}}"], "path": ["auth", "login", ""] },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/auth/login/",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "auth",
+                "login",
+                ""
+              ]
+            },
             "body": {
               "mode": "raw",
               "raw": "{\n  \"username\": \"demo\",\n  \"password\": \"demo12345\"\n}"
@@ -77,11 +118,75 @@
           }
         },
         {
+          "name": "Login (organization)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/auth/login/",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "auth",
+                "login",
+                ""
+              ]
+            },
+            "description": "Signs in an organization account and stores its token as `org_token`. Everything under Organization, and every request that changes the catalog, uses that token rather than the customer one.\n\nCreate this account first:\n    python manage.py create_org_user opsadmin --role admin\n\nThe response's user.role will be \"admin\" and user.is_organization true.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"opsadmin\",\n  \"password\": \"OpsStrong!2026\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.environment.set('org_token', body.token);",
+                  "// Remembering who we are lets the Accounts requests avoid acting on",
+                  "// the caller: an admin cannot change their own role or deactivate",
+                  "// themselves, so those requests would fail for an uninteresting reason.",
+                  "pm.environment.set('org_user_id', body.user.id);",
+                  "pm.test('is an organization account', () => {",
+                  "  pm.expect(body.user.is_organization).to.be.true;",
+                  "});",
+                  "console.log('Organization token saved as org_token.');"
+                ]
+              }
+            }
+          ]
+        },
+        {
           "name": "Me (current user)",
           "request": {
             "method": "GET",
-            "header": [{ "key": "Authorization", "value": "Token {{token}}" }],
-            "url": { "raw": "{{base_url}}/auth/me/", "host": ["{{base_url}}"], "path": ["auth", "me", ""] },
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Token {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/auth/me/",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "auth",
+                "me",
+                ""
+              ]
+            },
             "description": "Returns the user the token belongs to. 401 without a valid token. The frontend calls this on startup to check a stored token is still good."
           }
         }
@@ -110,7 +215,16 @@
           "request": {
             "method": "GET",
             "header": [],
-            "url": { "raw": "{{base_url}}/categories/", "host": ["{{base_url}}"], "path": ["categories", ""] },
+            "url": {
+              "raw": "{{base_url}}/categories/",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "categories",
+                ""
+              ]
+            },
             "description": "Public. Paginated, with product_count on each category. Supports ?search= and ?ordering=name or created_at."
           }
         },
@@ -119,7 +233,17 @@
           "request": {
             "method": "GET",
             "header": [],
-            "url": { "raw": "{{base_url}}/categories/{{category_id}}/", "host": ["{{base_url}}"], "path": ["categories", "{{category_id}}", ""] },
+            "url": {
+              "raw": "{{base_url}}/categories/{{category_id}}/",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "categories",
+                "{{category_id}}",
+                ""
+              ]
+            },
             "description": "Public. Uses the id saved by \"List categories\"."
           }
         },
@@ -140,12 +264,30 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Authorization", "value": "Token {{token}}" },
-              { "key": "Content-Type", "value": "application/json" }
+              {
+                "key": "Authorization",
+                "value": "Token {{org_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
             ],
-            "url": { "raw": "{{base_url}}/categories/", "host": ["{{base_url}}"], "path": ["categories", ""] },
-            "body": { "mode": "raw", "raw": "{\n  \"name\": \"Cameras\",\n  \"description\": \"Mirrorless and DSLR cameras\"\n}" },
-            "description": "Requires a token; returns 401 without one. Category names are unique, so running this twice returns 400."
+            "url": {
+              "raw": "{{base_url}}/categories/",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "categories",
+                ""
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Cameras\",\n  \"description\": \"Mirrorless and DSLR cameras\"\n}"
+            },
+            "description": "Requires a token; returns 401 without one. Category names are unique, so running this twice returns 400.\n\nRequires an ORGANIZATION account: a customer's token returns 403. Run \"Auth / Login (organization)\" first."
           }
         },
         {
@@ -153,21 +295,55 @@
           "request": {
             "method": "PUT",
             "header": [
-              { "key": "Authorization", "value": "Token {{token}}" },
-              { "key": "Content-Type", "value": "application/json" }
+              {
+                "key": "Authorization",
+                "value": "Token {{org_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
             ],
-            "url": { "raw": "{{base_url}}/categories/{{new_category_id}}/", "host": ["{{base_url}}"], "path": ["categories", "{{new_category_id}}", ""] },
-            "body": { "mode": "raw", "raw": "{\n  \"name\": \"Cameras & Lenses\",\n  \"description\": \"Updated description\"\n}" },
-            "description": "Full update. Use PATCH with only the changed fields for a partial update."
+            "url": {
+              "raw": "{{base_url}}/categories/{{new_category_id}}/",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "categories",
+                "{{new_category_id}}",
+                ""
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Cameras & Lenses\",\n  \"description\": \"Updated description\"\n}"
+            },
+            "description": "Full update. Use PATCH with only the changed fields for a partial update.\n\nRequires an ORGANIZATION account: a customer's token returns 403. Run \"Auth / Login (organization)\" first."
           }
         },
         {
           "name": "Delete category",
           "request": {
             "method": "DELETE",
-            "header": [{ "key": "Authorization", "value": "Token {{token}}" }],
-            "url": { "raw": "{{base_url}}/categories/{{new_category_id}}/", "host": ["{{base_url}}"], "path": ["categories", "{{new_category_id}}", ""] },
-            "description": "Deletes the category this collection created, so the seeded data stays intact. 204 on success, 409 if one of its products belongs to an existing order."
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Token {{org_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/categories/{{new_category_id}}/",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "categories",
+                "{{new_category_id}}",
+                ""
+              ]
+            },
+            "description": "Deletes the category this collection created, so the seeded data stays intact. 204 on success, 409 if one of its products belongs to an existing order.\n\nRequires an ORGANIZATION account: a customer's token returns 403. Run \"Auth / Login (organization)\" first."
           }
         }
       ]
@@ -198,7 +374,16 @@
           "request": {
             "method": "GET",
             "header": [],
-            "url": { "raw": "{{base_url}}/products/", "host": ["{{base_url}}"], "path": ["products", ""] },
+            "url": {
+              "raw": "{{base_url}}/products/",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "products",
+                ""
+              ]
+            },
             "description": "Public, paginated 10 per page. The response has count, next, previous and results."
           }
         },
@@ -209,9 +394,19 @@
             "header": [],
             "url": {
               "raw": "{{base_url}}/products/?search=phone",
-              "host": ["{{base_url}}"],
-              "path": ["products", ""],
-              "query": [{ "key": "search", "value": "phone" }]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "products",
+                ""
+              ],
+              "query": [
+                {
+                  "key": "search",
+                  "value": "phone"
+                }
+              ]
             },
             "description": "Case-insensitive match on name and description."
           }
@@ -223,9 +418,19 @@
             "header": [],
             "url": {
               "raw": "{{base_url}}/products/?category={{category_id}}",
-              "host": ["{{base_url}}"],
-              "path": ["products", ""],
-              "query": [{ "key": "category", "value": "{{category_id}}" }]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "products",
+                ""
+              ],
+              "query": [
+                {
+                  "key": "category",
+                  "value": "{{category_id}}"
+                }
+              ]
             },
             "description": "Filter by category id. ?category_name=phones filters by name instead."
           }
@@ -237,11 +442,22 @@
             "header": [],
             "url": {
               "raw": "{{base_url}}/products/?min_price=100&max_price=500",
-              "host": ["{{base_url}}"],
-              "path": ["products", ""],
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "products",
+                ""
+              ],
               "query": [
-                { "key": "min_price", "value": "100" },
-                { "key": "max_price", "value": "500" }
+                {
+                  "key": "min_price",
+                  "value": "100"
+                },
+                {
+                  "key": "max_price",
+                  "value": "500"
+                }
               ]
             },
             "description": "?price=149.50 also works as an exact match."
@@ -254,9 +470,19 @@
             "header": [],
             "url": {
               "raw": "{{base_url}}/products/?ordering=price",
-              "host": ["{{base_url}}"],
-              "path": ["products", ""],
-              "query": [{ "key": "ordering", "value": "price" }]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "products",
+                ""
+              ],
+              "query": [
+                {
+                  "key": "ordering",
+                  "value": "price"
+                }
+              ]
             },
             "description": "Use -price for most expensive first. name, created_at and stock are also allowed."
           }
@@ -268,11 +494,22 @@
             "header": [],
             "url": {
               "raw": "{{base_url}}/products/?page=2&page_size=5",
-              "host": ["{{base_url}}"],
-              "path": ["products", ""],
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "products",
+                ""
+              ],
               "query": [
-                { "key": "page", "value": "2" },
-                { "key": "page_size", "value": "5" }
+                {
+                  "key": "page",
+                  "value": "2"
+                },
+                {
+                  "key": "page_size",
+                  "value": "5"
+                }
               ]
             },
             "description": "page_size is capped at 100. Asking for a page past the end returns 404."
@@ -285,12 +522,26 @@
             "header": [],
             "url": {
               "raw": "{{base_url}}/products/?search=phone&in_stock=true&ordering=-price",
-              "host": ["{{base_url}}"],
-              "path": ["products", ""],
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "products",
+                ""
+              ],
               "query": [
-                { "key": "search", "value": "phone" },
-                { "key": "in_stock", "value": "true" },
-                { "key": "ordering", "value": "-price" }
+                {
+                  "key": "search",
+                  "value": "phone"
+                },
+                {
+                  "key": "in_stock",
+                  "value": "true"
+                },
+                {
+                  "key": "ordering",
+                  "value": "-price"
+                }
               ]
             },
             "description": "All query parameters can be combined; add &category={{category_id}} to narrow it further."
@@ -301,7 +552,17 @@
           "request": {
             "method": "GET",
             "header": [],
-            "url": { "raw": "{{base_url}}/products/{{product_id}}/", "host": ["{{base_url}}"], "path": ["products", "{{product_id}}", ""] },
+            "url": {
+              "raw": "{{base_url}}/products/{{product_id}}/",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "products",
+                "{{product_id}}",
+                ""
+              ]
+            },
             "description": "Uses the id saved by \"List products\"."
           }
         },
@@ -322,15 +583,30 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Authorization", "value": "Token {{token}}" },
-              { "key": "Content-Type", "value": "application/json" }
+              {
+                "key": "Authorization",
+                "value": "Token {{org_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
             ],
-            "url": { "raw": "{{base_url}}/products/", "host": ["{{base_url}}"], "path": ["products", ""] },
+            "url": {
+              "raw": "{{base_url}}/products/",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "products",
+                ""
+              ]
+            },
             "body": {
               "mode": "raw",
               "raw": "{\n  \"name\": \"Test Product\",\n  \"description\": \"Created from Postman\",\n  \"price\": \"199.99\",\n  \"stock\": 10,\n  \"category_id\": {{category_id}}\n}"
             },
-            "description": "The write field is category_id (a plain id), while responses return a nested category object. An unknown category_id or a negative price returns 400 naming the field."
+            "description": "The write field is category_id (a plain id), while responses return a nested category object. An unknown category_id or a negative price returns 400 naming the field.\n\nRequires an ORGANIZATION account: a customer's token returns 403. Run \"Auth / Login (organization)\" first."
           }
         },
         {
@@ -338,31 +614,146 @@
           "request": {
             "method": "PATCH",
             "header": [
-              { "key": "Authorization", "value": "Token {{token}}" },
-              { "key": "Content-Type", "value": "application/json" }
+              {
+                "key": "Authorization",
+                "value": "Token {{org_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
             ],
-            "url": { "raw": "{{base_url}}/products/{{new_product_id}}/", "host": ["{{base_url}}"], "path": ["products", "{{new_product_id}}", ""] },
-            "body": { "mode": "raw", "raw": "{\n  \"price\": \"179.99\",\n  \"stock\": 25\n}" },
-            "description": "PATCH sends only the changed fields; PUT would require the whole object."
+            "url": {
+              "raw": "{{base_url}}/products/{{new_product_id}}/",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "products",
+                "{{new_product_id}}",
+                ""
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"price\": \"179.99\",\n  \"stock\": 25\n}"
+            },
+            "description": "PATCH sends only the changed fields; PUT would require the whole object.\n\nRequires an ORGANIZATION account: a customer's token returns 403. Run \"Auth / Login (organization)\" first."
           }
         },
         {
           "name": "Delete product",
           "request": {
             "method": "DELETE",
-            "header": [{ "key": "Authorization", "value": "Token {{token}}" }],
-            "url": { "raw": "{{base_url}}/products/{{new_product_id}}/", "host": ["{{base_url}}"], "path": ["products", "{{new_product_id}}", ""] },
-            "description": "Deletes the product this collection created. 204 on success, 409 if the product belongs to an existing order."
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Token {{org_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/products/{{new_product_id}}/",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "products",
+                "{{new_product_id}}",
+                ""
+              ]
+            },
+            "description": "Deletes the product this collection created. 204 on success, 409 if the product belongs to an existing order.\n\nRequires an ORGANIZATION account: a customer's token returns 403. Run \"Auth / Login (organization)\" first."
           }
         },
         {
           "name": "Create product - unauthenticated (401)",
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "url": { "raw": "{{base_url}}/products/", "host": ["{{base_url}}"], "path": ["products", ""] },
-            "body": { "mode": "raw", "raw": "{\n  \"name\": \"Should not be created\",\n  \"price\": \"1.00\",\n  \"stock\": 1,\n  \"category_id\": {{category_id}}\n}" },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/products/",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "products",
+                ""
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Should not be created\",\n  \"price\": \"1.00\",\n  \"stock\": 1,\n  \"category_id\": {{category_id}}\n}"
+            },
             "description": "Deliberately sends no Authorization header. Expected: 401. Reading is public, writing is not."
+          }
+        },
+        {
+          "name": "Create product - as a customer (403)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Token {{token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/products/",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "products",
+                ""
+              ]
+            },
+            "description": "Deliberately uses the CUSTOMER token. Expected: 403. Reading the catalog is public, but changing it is an organization job - before roles existed, any registered customer could reprice or delete products.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Should not be created\",\n  \"price\": \"0.01\",\n  \"stock\": 1,\n  \"category_id\": \"{{category_id}}\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Adjust stock (organization)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Token {{org_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/products/{{product_id}}/adjust-stock/",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "products",
+                "{{product_id}}",
+                "adjust-stock",
+                ""
+              ]
+            },
+            "description": "Restock or correct a count. Send either a relative `delta` or an absolute `stock`, not both.\n\nPATCH {\"stock\": N} also works, but writes back the number you last saw, so an order placed in between is overwritten. `delta` is applied to the row under the same lock the order path uses.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"delta\": 10,\n  \"reason\": \"delivery received\"\n}"
+            }
           }
         }
       ]
@@ -387,11 +778,29 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Authorization", "value": "Token {{token}}" },
-              { "key": "Content-Type", "value": "application/json" }
+              {
+                "key": "Authorization",
+                "value": "Token {{token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
             ],
-            "url": { "raw": "{{base_url}}/orders/", "host": ["{{base_url}}"], "path": ["orders", ""] },
-            "body": { "mode": "raw", "raw": "{\n  \"product_id\": {{product_id}},\n  \"quantity\": 2\n}" },
+            "url": {
+              "raw": "{{base_url}}/orders/",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "orders",
+                ""
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"product_id\": {{product_id}},\n  \"quantity\": 2\n}"
+            },
             "description": "Only product_id and quantity are sent. The user comes from the token, and unit_price and total_price are calculated on the server - sending them has no effect. The product's stock is reduced by the quantity."
           }
         },
@@ -400,11 +809,29 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Authorization", "value": "Token {{token}}" },
-              { "key": "Content-Type", "value": "application/json" }
+              {
+                "key": "Authorization",
+                "value": "Token {{token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
             ],
-            "url": { "raw": "{{base_url}}/orders/", "host": ["{{base_url}}"], "path": ["orders", ""] },
-            "body": { "mode": "raw", "raw": "{\n  \"product_id\": {{product_id}},\n  \"quantity\": 99999\n}" },
+            "url": {
+              "raw": "{{base_url}}/orders/",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "orders",
+                ""
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"product_id\": {{product_id}},\n  \"quantity\": 99999\n}"
+            },
             "description": "Expected: 400 with a message naming how many units are available. Stock is left untouched."
           }
         },
@@ -412,9 +839,26 @@
           "name": "Create order - unauthenticated (401)",
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "url": { "raw": "{{base_url}}/orders/", "host": ["{{base_url}}"], "path": ["orders", ""] },
-            "body": { "mode": "raw", "raw": "{\n  \"product_id\": {{product_id}},\n  \"quantity\": 1\n}" },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/orders/",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "orders",
+                ""
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"product_id\": {{product_id}},\n  \"quantity\": 1\n}"
+            },
             "description": "Deliberately sends no Authorization header. Expected: 401."
           }
         },
@@ -422,8 +866,22 @@
           "name": "My orders",
           "request": {
             "method": "GET",
-            "header": [{ "key": "Authorization", "value": "Token {{token}}" }],
-            "url": { "raw": "{{base_url}}/orders/", "host": ["{{base_url}}"], "path": ["orders", ""] },
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Token {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/orders/",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "orders",
+                ""
+              ]
+            },
             "description": "Only the token owner's orders, newest first, paginated."
           }
         },
@@ -431,10 +889,837 @@
           "name": "Single order",
           "request": {
             "method": "GET",
-            "header": [{ "key": "Authorization", "value": "Token {{token}}" }],
-            "url": { "raw": "{{base_url}}/orders/{{order_id}}/", "host": ["{{base_url}}"], "path": ["orders", "{{order_id}}", ""] },
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Token {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/orders/{{order_id}}/",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "orders",
+                "{{order_id}}",
+                ""
+              ]
+            },
             "description": "Another user's order id returns 404, not 403, so order ids are not leaked."
           }
+        }
+      ]
+    },
+    {
+      "name": "Organization",
+      "description": "The API for the people who RUN the shop, mounted at /api/org/ and closed to customers: anonymous callers get 401, customers get 403.\n\nRun \"Auth / Login (organization)\" first - these all use {{org_token}}, not the customer {{token}}.\n\nCreate the account it signs in as with:\n    python manage.py create_org_user opsadmin --role admin",
+      "item": [
+        {
+          "name": "Orders",
+          "item": [
+            {
+              "name": "All orders (every customer)",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Token {{org_token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/org/orders/",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "org",
+                    "orders",
+                    ""
+                  ]
+                },
+                "description": "Every customer's orders, with the customer attached. The customer endpoint (/api/orders/) shows only your own; this is the opposite."
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('status is 200', () => pm.response.to.have.status(200));",
+                      "const rows = pm.response.json().results;",
+                      "if (rows.length) { pm.environment.set('org_order_id', rows[0].id); }"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Filter: open orders",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Token {{org_token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/org/orders/?open=true",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "org",
+                    "orders",
+                    ""
+                  ],
+                  "query": [
+                    {
+                      "key": "open",
+                      "value": "true"
+                    }
+                  ]
+                },
+                "description": "Anything not yet delivered or cancelled - the work queue."
+              }
+            },
+            {
+              "name": "Filter: by status",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Token {{org_token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/org/orders/?status=pending",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "org",
+                    "orders",
+                    ""
+                  ],
+                  "query": [
+                    {
+                      "key": "status",
+                      "value": "pending"
+                    }
+                  ]
+                },
+                "description": "Also ?status__in=pending,confirmed for several at once."
+              }
+            },
+            {
+              "name": "Filter: by customer",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Token {{org_token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/org/orders/?customer_username=demo",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "org",
+                    "orders",
+                    ""
+                  ],
+                  "query": [
+                    {
+                      "key": "customer_username",
+                      "value": "demo"
+                    }
+                  ]
+                },
+                "description": "Or ?customer=<id>. Combine with ?placed_after= and ?min_total=."
+              }
+            },
+            {
+              "name": "Search orders",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Token {{org_token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/org/orders/?search=phone",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "org",
+                    "orders",
+                    ""
+                  ],
+                  "query": [
+                    {
+                      "key": "search",
+                      "value": "phone"
+                    }
+                  ]
+                },
+                "description": "Searches product name, username and email."
+              }
+            },
+            {
+              "name": "The status workflow",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Token {{org_token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/org/orders/statuses/",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "org",
+                    "orders",
+                    "statuses",
+                    ""
+                  ]
+                },
+                "description": "Every status and what may follow it. A client can build its buttons from this instead of hard-coding a copy of the rules that can drift from the server's."
+              }
+            },
+            {
+              "name": "One order with its history",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Token {{org_token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/org/orders/{{org_order_id}}/",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "org",
+                    "orders",
+                    "{{org_order_id}}",
+                    ""
+                  ]
+                },
+                "description": "Includes `events` (who changed what, when and why) and `next_statuses` (what the server will accept next)."
+              }
+            },
+            {
+              "name": "Advance the status",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Token {{org_token}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/org/orders/{{org_order_id}}/status/",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "org",
+                    "orders",
+                    "{{org_order_id}}",
+                    "status",
+                    ""
+                  ]
+                },
+                "description": "Moves the order along. An invalid jump is refused with a message naming what is allowed instead, e.g. pending cannot become delivered.",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"status\": \"confirmed\",\n  \"note\": \"payment cleared\"\n}"
+                }
+              }
+            },
+            {
+              "name": "Invalid jump (400)",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Token {{org_token}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/org/orders/{{org_order_id}}/status/",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "org",
+                    "orders",
+                    "{{org_order_id}}",
+                    "status",
+                    ""
+                  ]
+                },
+                "description": "Expected: 400, naming the transitions allowed from here.",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"status\": \"delivered\"\n}"
+                }
+              }
+            },
+            {
+              "name": "Cancel an order",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Token {{org_token}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/org/orders/{{org_order_id}}/cancel/",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "org",
+                    "orders",
+                    "{{org_order_id}}",
+                    "cancel",
+                    ""
+                  ]
+                },
+                "description": "Returns the ordered units to the product, exactly once. A reason is required. A shipped order cannot be cancelled - that would need a returns process.",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"reason\": \"customer changed their mind\"\n}"
+                }
+              }
+            },
+            {
+              "name": "Cancel without a reason (400)",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Token {{org_token}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/org/orders/{{org_order_id}}/cancel/",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "org",
+                    "orders",
+                    "{{org_order_id}}",
+                    "cancel",
+                    ""
+                  ]
+                },
+                "description": "Expected: 400. Blocking an order needs an explanation on record.",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{}"
+                }
+              }
+            },
+            {
+              "name": "As a customer (403)",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Token {{token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/org/orders/",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "org",
+                    "orders",
+                    ""
+                  ]
+                },
+                "description": "Deliberately uses the customer token. Expected: 403."
+              }
+            }
+          ]
+        },
+        {
+          "name": "Dashboard",
+          "item": [
+            {
+              "name": "Dashboard",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Token {{org_token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/org/dashboard/",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "org",
+                    "dashboard",
+                    ""
+                  ]
+                },
+                "description": "The state of the shop in one request: order counts, revenue, per-status breakdown, customers, catalog health, best sellers, what needs attention, and a daily trend.\n\nRevenue is reported twice on purpose: `booked` is every non-cancelled order, `realised` is delivered only. Cancellations are excluded from both and shown separately."
+              }
+            },
+            {
+              "name": "Dashboard - last 7 days",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Token {{org_token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/org/dashboard/?days=7&low_stock_threshold=10",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "org",
+                    "dashboard",
+                    ""
+                  ],
+                  "query": [
+                    {
+                      "key": "days",
+                      "value": "7"
+                    },
+                    {
+                      "key": "low_stock_threshold",
+                      "value": "10"
+                    }
+                  ]
+                },
+                "description": "days is 1-365 (default 30); low_stock_threshold defaults to 5."
+              }
+            }
+          ]
+        },
+        {
+          "name": "Customers",
+          "item": [
+            {
+              "name": "All customers",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Token {{org_token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/org/customers/",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "org",
+                    "customers",
+                    ""
+                  ]
+                },
+                "description": "With order_count, total_spent and last_order_at. total_spent excludes cancelled orders; order_count includes them - different questions.\n\nOrganization accounts are absent, so this endpoint cannot be used on a colleague or on yourself."
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('status is 200', () => pm.response.to.have.status(200));",
+                      "const rows = pm.response.json().results;",
+                      "if (rows.length) { pm.environment.set('customer_id', rows[0].id); }"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Customers who have ordered",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Token {{org_token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/org/customers/?has_orders=true&ordering=-total_spent",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "org",
+                    "customers",
+                    ""
+                  ],
+                  "query": [
+                    {
+                      "key": "has_orders",
+                      "value": "true"
+                    },
+                    {
+                      "key": "ordering",
+                      "value": "-total_spent"
+                    }
+                  ]
+                },
+                "description": "Best customers first. Also ?min_orders=, ?is_active=, ?joined_after=."
+              }
+            },
+            {
+              "name": "One customer with recent orders",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Token {{org_token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/org/customers/{{customer_id}}/",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "org",
+                    "customers",
+                    "{{customer_id}}",
+                    ""
+                  ]
+                },
+                "description": "Their 10 most recent orders are attached."
+              }
+            },
+            {
+              "name": "Deactivate a customer",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Token {{org_token}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/org/customers/{{customer_id}}/deactivate/",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "org",
+                    "customers",
+                    "{{customer_id}}",
+                    "deactivate",
+                    ""
+                  ]
+                },
+                "description": "Blocks sign-in and deletes their token, so the change ends the current session rather than only the next login. Their orders are left untouched. A reason is required.",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"reason\": \"fraudulent orders\"\n}"
+                }
+              }
+            },
+            {
+              "name": "Reactivate a customer",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Token {{org_token}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/org/customers/{{customer_id}}/activate/",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "org",
+                    "customers",
+                    "{{customer_id}}",
+                    "activate",
+                    ""
+                  ]
+                },
+                "description": "Undoes a deactivation; they can sign in again.",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{}"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "Accounts (admin only)",
+          "item": [
+            {
+              "name": "Organization accounts",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Token {{org_token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/org/staff/",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "org",
+                    "staff",
+                    ""
+                  ]
+                },
+                "description": "Admin only. Staff may run the shop but not decide who else can - a staff token gets 403 here."
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('status is 200', () => pm.response.to.have.status(200));",
+                      "const rows = pm.response.json().results;",
+                      "const me = Number(pm.environment.get('org_user_id'));",
+                      "// Skip our own account: the requests below change a role and revoke",
+                      "// access, and both are refused when aimed at yourself.",
+                      "const colleague = rows.find((row) => row.id !== me);",
+                      "if (colleague) {",
+                      "  pm.environment.set('staff_id', colleague.id);",
+                      "} else {",
+                      "  console.log('No colleague yet - run \"Add a colleague\" first.');",
+                      "}"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Add a colleague",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Token {{org_token}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/org/staff/",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "org",
+                    "staff",
+                    ""
+                  ]
+                },
+                "description": "role is staff or admin; `customer` is rejected here, since creating a shopper is what public registration is for. is_superuser cannot be granted through the API, and the password is validated by Django's rules.",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"username\": \"noor\",\n  \"email\": \"noor@shop.test\",\n  \"password\": \"NoorStrong!2026\",\n  \"role\": \"staff\",\n  \"department\": \"Fulfilment\"\n}"
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "if (pm.response.code === 201) {",
+                      "  pm.environment.set('staff_id', pm.response.json().id);",
+                      "  console.log('Colleague created.');",
+                      "} else {",
+                      "  // A second run hits 'username already taken'; the list request",
+                      "  // above has already pointed staff_id at that same colleague.",
+                      "  console.log('Add returned ' + pm.response.code +",
+                      "              ' - using the colleague found by the list request.');",
+                      "}"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Change a colleague's role",
+              "request": {
+                "method": "PATCH",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Token {{org_token}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/org/staff/{{staff_id}}/",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "org",
+                    "staff",
+                    "{{staff_id}}",
+                    ""
+                  ]
+                },
+                "description": "PATCH also accepts role=customer, which revokes organization access while leaving the person able to shop. You cannot change your OWN role: an accidental self-demotion would end your access mid-session.\n\nActs on the colleague created above, never on yourself: an admin cannot change their own role.",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"role\": \"admin\",\n  \"department\": \"Operations\"\n}"
+                }
+              }
+            },
+            {
+              "name": "Revoke access",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Token {{org_token}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/org/staff/{{staff_id}}/deactivate/",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "org",
+                    "staff",
+                    "{{staff_id}}",
+                    "deactivate",
+                    ""
+                  ]
+                },
+                "description": "Deletes their token too. You cannot deactivate yourself.\n\nActs on the colleague created above. You cannot deactivate your own account.",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"reason\": \"left the company\"\n}"
+                }
+              }
+            },
+            {
+              "name": "Restore access",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Token {{org_token}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/org/staff/{{staff_id}}/activate/",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "org",
+                    "staff",
+                    "{{staff_id}}",
+                    "activate",
+                    ""
+                  ]
+                },
+                "description": "Undoes a revocation.",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{}"
+                }
+              }
+            }
+          ]
         }
       ]
     },
@@ -442,8 +1727,23 @@
       "name": "Auth / Logout (run last)",
       "request": {
         "method": "POST",
-        "header": [{ "key": "Authorization", "value": "Token {{token}}" }],
-        "url": { "raw": "{{base_url}}/auth/logout/", "host": ["{{base_url}}"], "path": ["auth", "logout", ""] },
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Token {{token}}"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/auth/logout/",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "auth",
+            "logout",
+            ""
+          ]
+        },
         "description": "Deletes the token server side. 204 on success, and every later request with that token returns 401 - which is why this sits at the end of the collection. Run Login again to get a new token."
       }
     }

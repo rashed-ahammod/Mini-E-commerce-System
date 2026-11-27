@@ -8,6 +8,11 @@ pagination, token authentication and orders. The frontend is a small shop:
 browse and filter a catalog of 49 real products, add things to a cart, log
 in, place orders and look at your order history.
 
+It also has a **second side**: organization accounts that run the shop —
+working through every customer's orders, managing the catalog and stock,
+reading a dashboard, and administering accounts. Customers never see any of
+it; see [the organization API](#the-organization-side).
+
 ```
 ┌─────────────────────────┐        HTTP + token auth        ┌──────────────────────────┐
 │  React frontend (Vite)  │ ──────────────────────────────▶ │  Django REST Framework   │
@@ -109,7 +114,7 @@ Open <http://localhost:5173>.
 
 ```bash
 cd backend
-python manage.py test               # 70 tests
+python manage.py test               # 246 tests
 ```
 
 ## Sample catalog
@@ -180,8 +185,10 @@ Everything the assignment asks for, plus two of the optional extras.
 | **Optional:** stock validation | `orders/serializers.py` |
 | **Optional:** product image | `Product.image` (upload) and `Product.image_url` (hosted elsewhere) |
 
-Beyond the brief: 70 automated tests, a seeded catalog of 49 real products,
-a React frontend, and deployment configuration.
+Beyond the brief: an entire organization side (roles, order lifecycle,
+dashboard, customer and account management), 246 automated tests, a seeded
+catalog of 49 real products, a React frontend, and deployment
+configuration.
 
 ## API at a glance
 
@@ -221,6 +228,53 @@ curl -X POST http://127.0.0.1:8000/api/orders/ \
   -H "Authorization: Token $TOKEN" -H "Content-Type: application/json" \
   -d '{"product_id": 1, "quantity": 2}'
 ```
+
+## The organization side
+
+Two kinds of account share one login. A **customer** shops; an
+**organization user** runs the shop. `Profile.role` — `customer`, `staff` or
+`admin` — decides which, and every login reports it, so a client knows which
+interface to show without a second request.
+
+| | Customer | Staff | Admin |
+| --- | --- | --- | --- |
+| Browse the catalog | ✅ | ✅ | ✅ |
+| Place and view **their own** orders | ✅ | ✅ | ✅ |
+| Change the catalog, adjust stock | — | ✅ | ✅ |
+| See and work **every** order | — | ✅ | ✅ |
+| Dashboard, customer management | — | ✅ | ✅ |
+| Create and manage organization accounts | — | — | ✅ |
+
+```
+POST /api/org/orders/{id}/status/      advance an order
+POST /api/org/orders/{id}/cancel/      cancel it, returning the stock
+GET  /api/org/dashboard/               revenue, counts, best sellers, trend
+GET  /api/org/customers/               who buys, what they have spent
+POST /api/org/customers/{id}/deactivate/
+GET  /api/org/staff/                   colleagues (admin only)
+```
+
+Orders move through a lifecycle rather than being edited:
+
+```
+pending ──► confirmed ──► processing ──► shipped ──► delivered
+   │            │              │
+   └────────────┴──────────────┴──► cancelled
+```
+
+The rules live on the model, so the API, the admin site and a shell all
+behave the same, every transition is recorded with who did it and why, and
+cancelling returns the stock exactly once. A shipped order cannot be
+cancelled — that needs a returns process.
+
+The first organization admin is created from the command line, because an
+API that needs an admin in order to create an admin cannot bootstrap itself:
+
+```bash
+python manage.py create_org_user alice --role admin
+```
+
+Full endpoint tables are in [backend/README.md](backend/README.md).
 
 ## Testing with Postman
 

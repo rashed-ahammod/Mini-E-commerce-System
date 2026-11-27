@@ -69,6 +69,7 @@ category, so a second run updates them instead of creating duplicates. Add
 | --- | --- |
 | `python manage.py seed_data` | Load the 49-product sample catalog. `--flush` clears first, `--demo-user` adds a `demo` account |
 | `python manage.py db_info` | Report which database is actually in use: engine, host, TLS mode, server version, connection time and table count |
+| `python manage.py create_org_user <name> --role admin\|staff` | Create (or `--promote`) an organization account. This is how the first admin is made. |
 
 `db_info` is the quickest way to tell whether you are on the local SQLite
 file or a hosted PostgreSQL, and it warns if a pooled connection string is
@@ -103,22 +104,27 @@ everything under `/api/orders/`, requires a token.
 | Method | Path | Auth | Description |
 | --- | --- | --- | --- |
 | GET | `/` | — | List, paginated, each with `product_count`. |
-| POST | `/` | token | Create. |
+| POST | `/` | **organization** | Create. |
 | GET | `/{id}/` | — | Single category. |
-| PUT / PATCH | `/{id}/` | token | Full / partial update. |
-| DELETE | `/{id}/` | token | Delete (204), or **409** if one of its products belongs to an order. |
+| PUT / PATCH | `/{id}/` | **organization** | Full / partial update. |
+| DELETE | `/{id}/` | **organization** | Delete (204), or **409** if one of its products belongs to an order. |
 
 Supports `?search=` (name, description) and `?ordering=name|created_at`.
+
+Reading is public, but changing the catalog requires an organization
+account: a customer with a valid token gets **403**. See
+[Organization](#organization--apiorg).
 
 ### Products — `/api/products/`
 
 | Method | Path | Auth | Description |
 | --- | --- | --- | --- |
 | GET | `/` | — | List, paginated. |
-| POST | `/` | token | Create. |
+| POST | `/` | **organization** | Create. |
 | GET | `/{id}/` | — | Product details. |
-| PUT / PATCH | `/{id}/` | token | Full / partial update. |
-| DELETE | `/{id}/` | token | Delete (204), or **409** if the product belongs to an order. |
+| PUT / PATCH | `/{id}/` | **organization** | Full / partial update. |
+| DELETE | `/{id}/` | **organization** | Delete (204), or **409** if the product belongs to an order. |
+| POST | `/{id}/adjust-stock/` | **organization** | Restock or correct a count (see below). |
 
 Query parameters, all combinable:
 
@@ -149,6 +155,26 @@ id:
 // POST /api/products/
 { "name": "iPhone 13 Pro", "price": "1099.00", "stock": 32, "category_id": 1 }
 ```
+
+#### Stock adjustment
+
+`POST /api/products/{id}/adjust-stock/`, organization only:
+
+```jsonc
+{"delta": 25, "reason": "delivery received"}   // relative change
+{"stock": 40, "reason": "stocktake"}           // absolute count
+```
+
+Exactly one of `delta` or `stock` must be given. The response carries the
+product plus `previous_stock`, `new_stock` and `reason`.
+
+`PATCH {"stock": 40}` also works, but the two are not equally safe: PATCH
+writes back the number the operator last saw, so an order placed in between
+is overwritten and the shop oversells. `delta` is applied to the row inside
+a transaction, under the same lock the order path uses. A delta that would
+take stock below zero is refused, naming what is available.
+
+`?low_stock=5` on the product list shows what needs reordering.
 
 #### Product pictures
 
@@ -200,14 +226,122 @@ Ordering more than the available stock returns 400 and leaves stock untouched:
 
 A successful order reduces the product's stock by the ordered quantity.
 
+### Organization — `/api/org/`
+
+The shop has two kinds of account. A **customer** browses and places their
+own orders. An **organization user** runs the shop: they see every order,
+move it through its lifecycle and manage the catalog. Both are ordinary
+Django users; a `Profile.role` of `customer`, `staff` or `admin` decides
+what they may do, and every login and `/auth/me/` response reports it.
+
+Everything below answers **401** to an anonymous caller and **403** to a
+customer. A superuser always counts as an organization admin, so the owner
+of the server cannot be locked out.
+
+#### Orders — `/api/org/orders/`
+
+| Method | Path | Role | Description |
+| --- | --- | --- | --- |
+| GET | `/` | staff | **Every** customer's orders (the customer endpoint shows only your own) |
+| GET | `/{id}/` | staff | One order with its full history and the transitions allowed next |
+| POST | `/{id}/status/` | staff | Advance the status: `{"status": "confirmed", "note": "..."}` |
+| POST | `/{id}/cancel/` | staff | Cancel and return the stock: `{"reason": "..."}` (required) |
+| GET | `/statuses/` | staff | The workflow itself, so a client need not hard-code it |
+
+Filters: `status`, `status__in=pending,confirmed`, `open=true|false`,
+`customer`, `customer_username`, `product`, `placed_after`, `placed_before`,
+`min_total`, `max_total`, plus `search=` over product name, username and
+email, and `ordering=` on `created_at`, `total_price`, `status`.
+
+#### Dashboard — `/api/org/dashboard/`
+
+`GET` returns order counts, revenue, a per-status breakdown, customer
+figures, catalog health, best sellers, what needs attention and a daily
+trend — in one request. `?days=` (1–365, default 30) and
+`?low_stock_threshold=` (default 5).
+
+#### Customers — `/api/org/customers/`
+
+| Method | Path | Role | Description |
+| --- | --- | --- | --- |
+| GET | `/` | staff | Customers with `order_count`, `total_spent`, `last_order_at` |
+| GET | `/{id}/` | staff | One customer and their recent orders |
+| POST | `/{id}/deactivate/` | staff | Block sign-in: `{"reason": "..."}` (required) |
+| POST | `/{id}/activate/` | staff | Undo it |
+
+Filters: `is_active`, `has_orders`, `min_orders`, `joined_after`,
+`joined_before`, `search=` over username and email.
+
+Read and suspend only — no create, edit or delete. Deleting a customer
+would cascade to their orders and destroy the sales history, so an unwanted
+account is deactivated instead; their orders are untouched and their
+existing token is revoked immediately. Organization accounts are absent
+from this endpoint, so it cannot be used on a colleague or on yourself.
+
+#### Organization accounts — `/api/org/staff/`
+
+| Method | Path | Role | Description |
+| --- | --- | --- | --- |
+| GET | `/` | **admin** | Colleagues |
+| POST | `/` | **admin** | Add one: `{username, email, password, role, department}` |
+| GET | `/{id}/` | **admin** | One of them |
+| PATCH | `/{id}/` | **admin** | Change role, department, phone or email |
+| POST | `/{id}/deactivate/` | **admin** | Revoke access: `{"reason": "..."}` |
+| POST | `/{id}/activate/` | **admin** | Restore it |
+
+Admin-only rather than staff-only: deciding who else may run the shop is a
+different kind of decision from running it. `role` accepts `staff` or
+`admin` on create; `PATCH` also accepts `customer`, which revokes
+organization access while leaving the person able to shop. Passwords cannot
+be set or read here, and `is_superuser` cannot be granted through the API.
+
+Two guards prevent an admin locking everyone out: you cannot change your own
+role, and you cannot deactivate your own account.
+
+**The first organization admin** is created from the command line, because
+an API that needs an admin in order to create an admin cannot bootstrap
+itself:
+
+```bash
+python manage.py create_org_user alice --role admin
+python manage.py create_org_user bob --role staff --department Fulfilment
+python manage.py create_org_user cara --role staff --promote   # existing user
+```
+
+### Order lifecycle
+
+```
+pending ──► confirmed ──► processing ──► shipped ──► delivered
+   │            │              │
+   └────────────┴──────────────┴──► cancelled
+```
+
+Transitions are enforced by `Order.transition_to()` on the model, so the
+API, the Django admin and a shell all behave identically. A refused move
+says what is allowed instead:
+
+```json
+{ "status": ["An order that is pending cannot become delivered. Allowed from here: cancelled, confirmed."] }
+```
+
+- **A shipped order cannot be cancelled.** Undoing it needs a returns
+  process with its own refund and restocking rules.
+- **Cancelling returns the stock**, under the same row lock the order path
+  uses, and a `stock_restored` flag makes it idempotent so a retried request
+  cannot hand the units back twice.
+- **Every transition is recorded** — who, when, from, to and why — and the
+  history survives the staff account being deleted.
+- Customers see `status` on their own orders but cannot change it.
+
 ### Status codes used
 
 | Code | When |
 | --- | --- |
 | 200 / 201 / 204 | Success / created / deleted |
 | 400 | Validation failed — the body names the offending field |
-| 401 | Missing, malformed or invalidated token |
-| 404 | No such object — including another user's order |
+| 401 | Missing, malformed or invalidated token — log in |
+| 403 | Authenticated, but the wrong kind of account (a customer on an organization endpoint) |
+| 404 | No such object — including another user's order, and an organization account looked up through the customer endpoint |
 | 405 | Method not allowed (e.g. editing an order) |
 | 409 | Delete refused because existing orders reference the object |
 
@@ -219,13 +353,19 @@ python manage.py test orders       # one app
 python manage.py test orders.tests.CreateOrderTests.test_successful_order_reduces_stock
 ```
 
-70 tests run against a throwaway database, so they never touch `db.sqlite3`.
+246 tests run against a throwaway database, so they never touch `db.sqlite3`.
 
 | File | Covers |
 | --- | --- |
 | `accounts/tests.py` | registration (hashing, weak and duplicate usernames), login, the identical message for wrong password vs unknown user, `me`, token invalidation on logout |
 | `catalog/tests.py` | category and product CRUD, read-public / write-authenticated, every filter, search, ordering and pagination parameter, the 409 on deleting something an order references, and how a product's picture is resolved |
 | `orders/tests.py` | server-calculated prices, stock decrement, every stock-validation path, the price snapshot, order isolation between users, and 405 on editing an order |
+| `orders/test_lifecycle.py` | status transitions, stock restored once on cancellation, and the history |
+| `accounts/test_roles.py` | roles, the permission classes, role in the auth payloads, and that registration cannot grant one |
+| `organization/test_orders.py` | the organization order API and its access rules |
+| `organization/test_dashboard.py` | every dashboard figure, asserted arithmetically |
+| `organization/test_customers.py` | customer listing, spend figures, deactivation |
+| `organization/test_staff.py` | account provisioning and the lockout guards |
 
 The ones worth reading first are the behaviours that are easy to get wrong:
 `test_client_cannot_choose_its_own_price`, `test_a_rejected_order_leaves_stock_untouched`,

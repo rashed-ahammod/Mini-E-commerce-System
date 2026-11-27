@@ -14,8 +14,8 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from accounts.models import Role
-from accounts.permissions import IsOrganizationUser
+from accounts.models import Role, profile_for
+from accounts.permissions import IsOrganizationAdmin, IsOrganizationUser
 from orders.models import InvalidTransition, Order, OrderStatus
 
 from .dashboard import build_dashboard
@@ -25,6 +25,9 @@ from .serializers import (
     CustomerListSerializer,
     CustomerStatusSerializer,
     DashboardQuerySerializer,
+    OrgStaffCreateSerializer,
+    OrgStaffSerializer,
+    OrgStaffUpdateSerializer,
     OrderCancelSerializer,
     OrderStatusUpdateSerializer,
     OrgOrderDetailSerializer,
@@ -296,3 +299,190 @@ class OrgCustomerViewSet(
         customer.save(update_fields=["is_active"])
 
         return self._detail_response(customer)
+
+
+class OrgStaffViewSet(
+    mixins.ListModelMixin,
+    mixins.RetrieveModelMixin,
+    mixins.CreateModelMixin,
+    mixins.UpdateModelMixin,
+    viewsets.GenericViewSet,
+):
+    """The organization's own accounts — admins only.
+
+        GET    /api/org/staff/                  colleagues
+        POST   /api/org/staff/                  add one
+        GET    /api/org/staff/{id}/             one of them
+        PATCH  /api/org/staff/{id}/             change role or details
+        POST   /api/org/staff/{id}/deactivate/  revoke access
+        POST   /api/org/staff/{id}/activate/    restore it
+
+    Admin-only rather than staff-only: deciding who else may run the shop is
+    a different kind of decision from running it. The first admin is created
+    with `manage.py create_org_user`, because an API that needs an admin in
+    order to create an admin cannot bootstrap itself.
+
+    Two guards stop an admin from locking everyone out:
+
+    * you cannot change your own role — demoting yourself by accident would
+      end your access mid-session;
+    * you cannot deactivate your own account.
+
+    Together those are sufficient today: the caller is always an admin, so
+    any account they act on other than their own leaves the caller holding
+    admin rights. `_would_remove_the_last_admin` is a third check behind
+    them, and with the self-guards in place it cannot currently fire. It is
+    kept as a backstop for a future caller — a bulk action, a scheduled
+    cleanup, a relaxed self-guard — that could otherwise empty the role.
+    Its behaviour is unit-tested directly rather than through HTTP, because
+    pretending it is reachable would be a test that passes for the wrong
+    reason.
+
+    Deleting is not offered: an account that has moved orders along owns
+    history that should keep their name on it. Revoke access instead.
+    """
+
+    permission_classes = [IsOrganizationAdmin]
+    serializer_class = OrgStaffSerializer
+    filterset_fields = ["is_active", "profile__role"]
+    search_fields = ["username", "email", "profile__department"]
+    ordering_fields = ["username", "date_joined", "last_login"]
+    ordering = ["username"]
+
+    def get_queryset(self):
+        """Organization accounts only — customers have their own endpoint.
+
+        Superusers are included even without an explicit organization role,
+        because the permission classes already treat them as admins; leaving
+        them out would make this list disagree with who can actually act.
+        """
+        return (
+            User.objects.filter(
+                Q(profile__role__in=[Role.STAFF, Role.ADMIN]) | Q(is_superuser=True)
+            )
+            .select_related("profile")
+            .distinct()
+        )
+
+    def get_serializer_class(self):
+        if self.action == "create":
+            return OrgStaffCreateSerializer
+        if self.action in ("update", "partial_update"):
+            return OrgStaffUpdateSerializer
+        return OrgStaffSerializer
+
+    # -- guards -----------------------------------------------------------
+
+    def _is_self(self, account) -> bool:
+        return account.pk == self.request.user.pk
+
+    def _active_admin_count(self, excluding=None) -> int:
+        admins = self.get_queryset().filter(
+            Q(profile__role=Role.ADMIN) | Q(is_superuser=True), is_active=True
+        )
+        if excluding is not None:
+            admins = admins.exclude(pk=excluding.pk)
+        return admins.count()
+
+    def _would_remove_the_last_admin(self, account) -> bool:
+        profile = profile_for(account)
+        is_admin = bool(profile and profile.is_organization_admin) and account.is_active
+        return is_admin and self._active_admin_count(excluding=account) == 0
+
+    def _detail_response(self, account):
+        account.refresh_from_db()
+        return Response(
+            OrgStaffSerializer(account, context=self.get_serializer_context()).data
+        )
+
+    # -- actions ----------------------------------------------------------
+
+    def create(self, request, *args, **kwargs):
+        serializer = OrgStaffCreateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        account = serializer.save()
+        response = self._detail_response(account)
+        response.status_code = status.HTTP_201_CREATED
+        return response
+
+    def update(self, request, *args, **kwargs):
+        account = self.get_object()
+        serializer = OrgStaffUpdateSerializer(
+            account, data=request.data, partial=kwargs.pop("partial", False)
+        )
+        serializer.is_valid(raise_exception=True)
+
+        new_role = serializer.validated_data.get("role")
+
+        if new_role and self._is_self(account):
+            return Response(
+                {"role": ["You cannot change your own role."]},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if (
+            new_role
+            and new_role != Role.ADMIN
+            and self._would_remove_the_last_admin(account)
+        ):
+            return Response(
+                {
+                    "role": [
+                        "This is the only active organization admin. Promote "
+                        "someone else before changing this account's role."
+                    ]
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        serializer.save()
+        return self._detail_response(account)
+
+    @action(detail=True, methods=["post"])
+    def deactivate(self, request, pk=None):
+        """POST /api/org/staff/{id}/deactivate/ {"reason": "..."}"""
+        account = self.get_object()
+        reason = CustomerStatusSerializer(data=request.data)
+        reason.is_valid(raise_exception=True)
+
+        if self._is_self(account):
+            return Response(
+                {"detail": "You cannot deactivate your own account."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if not account.is_active:
+            return Response(
+                {"detail": "This account is already deactivated."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if self._would_remove_the_last_admin(account):
+            return Response(
+                {
+                    "detail": "This is the only active organization admin. "
+                    "Promote someone else first."
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        account.is_active = False
+        account.save(update_fields=["is_active"])
+        Token.objects.filter(user=account).delete()
+
+        return self._detail_response(account)
+
+    @action(detail=True, methods=["post"])
+    def activate(self, request, pk=None):
+        """POST /api/org/staff/{id}/activate/ — restore a revoked account."""
+        account = self.get_object()
+
+        if account.is_active:
+            return Response(
+                {"detail": "This account is already active."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        account.is_active = True
+        account.save(update_fields=["is_active"])
+        return self._detail_response(account)
